@@ -29,6 +29,13 @@ export const taskInputSchema = z
       .optional()
       .transform(emptyToNull),
     remind_before_min: z.number().int().min(0).max(10080).nullable().optional(),
+    duration_min: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .nullable()
+      .optional(),
   })
   .superRefine((t, ctx) => {
     if (t.kind === "plan" && !t.date) {
@@ -50,7 +57,9 @@ export const taskInputSchema = z
     // Only couple tasks have an assignee; personal ones are always yours.
     assignee_id: t.visibility === "couple" ? (t.assignee_id ?? null) : null,
     end_date: t.kind === "plan" && t.end_date && t.end_date !== t.date ? t.end_date : null,
-    remind_before_min: t.date ? (t.remind_before_min ?? null) : null,
+    // Email reminders need a time to count back from.
+    remind_before_min: t.time ? (t.remind_before_min ?? null) : null,
+    duration_min: t.duration_min ?? null,
     points: t.kind === "todo" && t.visibility === "couple" ? (t.points ?? null) : null,
   }));
 

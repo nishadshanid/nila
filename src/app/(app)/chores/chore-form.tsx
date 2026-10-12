@@ -18,6 +18,7 @@ import { describeRule } from "@/lib/recurrence";
 import type { AssignmentType, Chore, RecurFreq, RotationUnit } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { usePointRules } from "@/components/points/rules-context";
+import { DURATION_PRESETS, MinutesSelect, REMIND_PRESETS } from "@/components/minutes-select";
 import { saveChore } from "./actions";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -480,26 +481,24 @@ export function ChoreForm({
             required
           />
         </Field>
-        <Field label="Takes (minutes)" htmlFor="duration_min">
-          <Input
+        <Field label="Takes" htmlFor="duration_min">
+          <MinutesSelect
             id="duration_min"
-            type="number"
-            min={1}
-            inputMode="numeric"
             value={state.duration_min}
-            onChange={(e) => set("duration_min", e.target.value)}
-            placeholder="e.g. 30"
+            onChange={(v) => set("duration_min", v)}
+            presets={DURATION_PRESETS}
+            noneLabel="Not set"
           />
         </Field>
-        <Field label="Remind before (min)" htmlFor="remind_before_min">
-          <Input
+        <Field label="Email reminder" htmlFor="remind_before_min">
+          <MinutesSelect
             id="remind_before_min"
-            type="number"
-            min={0}
-            inputMode="numeric"
             value={state.remind_before_min}
-            onChange={(e) => set("remind_before_min", e.target.value)}
-            placeholder="e.g. 15"
+            onChange={(v) => set("remind_before_min", v)}
+            presets={REMIND_PRESETS}
+            noneLabel={state.due_time ? "No reminder" : "Set a time first"}
+            customSuffix=" before"
+            disabled={!state.due_time}
           />
         </Field>
       </div>

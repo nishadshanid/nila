@@ -33,3 +33,27 @@ export async function updateProfile(
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+const notificationsSchema = z.object({
+  email_notifications: z.boolean(),
+  digest_time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time"),
+});
+
+/** Your own email settings: on/off and when the morning digest comes. */
+export async function updateNotifications(
+  input: z.input<typeof notificationsSchema>,
+): Promise<ProfileState> {
+  const parsed = notificationsSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You're signed out." };
+
+  const { error } = await supabase.from("profiles").update(parsed.data).eq("id", user.id);
+  if (error) return { error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}

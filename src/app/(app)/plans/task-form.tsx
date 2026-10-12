@@ -14,6 +14,7 @@ import { taskInputSchema, type TaskInput } from "@/lib/task-schema";
 import type { DateStr } from "@/lib/dates";
 import type { Task } from "@/lib/types";
 import { usePointRules } from "@/components/points/rules-context";
+import { DURATION_PRESETS, MinutesSelect, REMIND_PRESETS } from "@/components/minutes-select";
 import { taskEarnsPoints } from "@/lib/points";
 import { saveTask } from "./actions";
 
@@ -63,6 +64,7 @@ export function TaskForm({
     time: task?.time?.slice(0, 5) ?? "",
     end_date: task?.end_date ?? "",
     remind_before_min: task?.remind_before_min?.toString() ?? "",
+    duration_min: task?.duration_min?.toString() ?? "",
   }));
   const rules = usePointRules();
   const earnsPoints = taskEarnsPoints(state);
@@ -88,6 +90,7 @@ export function TaskForm({
       time: state.time,
       end_date: state.end_date,
       remind_before_min: state.remind_before_min === "" ? null : Number(state.remind_before_min),
+      duration_min: state.duration_min === "" ? null : Number(state.duration_min),
     };
     const parsed = taskInputSchema.safeParse(input);
     if (!parsed.success) {
@@ -225,18 +228,27 @@ export function TaskForm({
           </Field>
         )}
         {state.date && (
-          <Field label="Remind before (min)" htmlFor="remind">
-            <Input
+          <Field label="Email reminder" htmlFor="remind">
+            <MinutesSelect
               id="remind"
-              type="number"
-              min={0}
-              inputMode="numeric"
               value={state.remind_before_min}
-              onChange={(e) => set("remind_before_min", e.target.value)}
-              placeholder="e.g. 30"
+              onChange={(v) => set("remind_before_min", v)}
+              presets={REMIND_PRESETS}
+              noneLabel={state.time ? "No reminder" : "Set a time first"}
+              customSuffix=" before"
+              disabled={!state.time}
             />
           </Field>
         )}
+        <Field label="Takes" htmlFor="duration">
+          <MinutesSelect
+            id="duration"
+            value={state.duration_min}
+            onChange={(v) => set("duration_min", v)}
+            presets={DURATION_PRESETS}
+            noneLabel="Not set"
+          />
+        </Field>
       </div>
 
       <Field label="Notes (optional)" htmlFor="notes">

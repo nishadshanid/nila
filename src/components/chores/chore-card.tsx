@@ -23,6 +23,7 @@ import { categoryMeta, formatTime, priorityMeta } from "@/lib/chore-meta";
 import { pointsFor } from "@/lib/points";
 import type { OccurrenceWithChore } from "@/lib/chores";
 import { cn } from "@/lib/utils";
+import { StartsIn, TimerButton } from "@/components/timers/timer";
 import { HandOverDialog } from "./hand-over-dialog";
 import { personById, type Person } from "./people";
 
@@ -139,6 +140,13 @@ export function ChoreCard({
             </>
           )}
           {time}
+          {!done && !paused && (
+            <StartsIn
+              date={occurrence.date}
+              time={occurrence.due_time}
+              durationMin={chore.duration_min}
+            />
+          )}
           {done && completedBy && (
             <>
               {(time || turnOf) && " · "}
@@ -150,6 +158,14 @@ export function ChoreCard({
         {moved && <p className="text-xs text-amber-700 dark:text-amber-400">{moved}</p>}
       </div>
 
+      {chore.duration_min && !done && !paused && !readOnly && (
+        <TimerButton
+          id={`chore-${occurrence.id}`}
+          title={chore.title}
+          minutes={chore.duration_min}
+          onFinish={() => toggle(true)}
+        />
+      )}
       {canTakeBack && !done ? (
         <Button
           size="sm"

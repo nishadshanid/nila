@@ -19,6 +19,7 @@ import { deleteTask, setTaskDone } from "@/app/(app)/plans/actions";
 import { formatTime, priorityMeta } from "@/lib/chore-meta";
 import { relativeDay, type DateStr } from "@/lib/dates";
 import { pointsFor, taskEarnsPoints } from "@/lib/points";
+import { StartsIn, TimerButton } from "@/components/timers/timer";
 import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +112,9 @@ export function TaskRow({
               · {overdue ? `Overdue (${when})` : when}
             </span>
           )}
+          {!done && task.date && (
+            <StartsIn date={task.date} time={task.time} durationMin={task.duration_min} />
+          )}
           {done && completedBy && task.visibility === "couple" && (
             <span>· done by {completedBy.id === meId ? "you" : completedBy.name}</span>
           )}
@@ -119,6 +123,14 @@ export function TaskRow({
           <p className="text-muted-foreground mt-0.5 truncate text-xs">{task.notes}</p>
         )}
       </div>
+      {task.duration_min && !done && (
+        <TimerButton
+          id={`task-${task.id}`}
+          title={task.title}
+          minutes={task.duration_min}
+          onFinish={() => toggle(true)}
+        />
+      )}
       <PointsPill points={points} />
       <span
         className={cn("size-2 shrink-0 rounded-full", priority.dot)}
