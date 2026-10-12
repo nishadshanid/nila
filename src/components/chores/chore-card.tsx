@@ -10,12 +10,20 @@ import type { OccurrenceWithChore } from "@/lib/chores";
 import { cn } from "@/lib/utils";
 import { personById, type Person } from "./people";
 
+const SLOT_NAMES = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
+
+/**
+ * One chore on one day. `readOnly` shows your partner's chores: you see whether
+ * they're done, but only they can tick them off.
+ */
 export function ChoreCard({
   occurrence,
   people,
+  readOnly = false,
 }: {
   occurrence: OccurrenceWithChore;
   people: Person[];
+  readOnly?: boolean;
 }) {
   const { chore } = occurrence;
   const [done, setDone] = useOptimistic(occurrence.status === "done");
@@ -23,7 +31,10 @@ export function ChoreCard({
   const Icon = categoryMeta(chore.category).icon;
   const priority = priorityMeta(chore.priority);
   const completedBy = personById(people, occurrence.completed_by);
-  const time = formatTime(chore.due_time);
+  const time = formatTime(occurrence.due_time);
+  const slotName =
+    chore.times_per_day > 1 ? `${SLOT_NAMES[occurrence.slot]} of ${chore.times_per_day}` : null;
+  const details = [time, slotName].filter(Boolean).join(" · ");
 
   function toggle(checked: boolean) {
     startTransition(async () => {
@@ -42,18 +53,22 @@ export function ChoreCard({
     >
       <Checkbox
         checked={done}
-        disabled={pending}
+        disabled={pending || readOnly}
         onCheckedChange={(checked) => toggle(checked === true)}
-        aria-label={`Mark ${chore.title} as ${done ? "not done" : "done"}`}
+        aria-label={
+          readOnly
+            ? `${chore.title}: ${done ? "done" : "not done yet"}`
+            : `Mark ${chore.title} as ${done ? "not done" : "done"}`
+        }
         className="size-5"
       />
       <Icon className="text-muted-foreground size-4 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className={cn("truncate font-medium", done && "line-through")}>{chore.title}</p>
-        {(time || (done && completedBy)) && (
-          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            {time}
-            {time && done && completedBy && " · "}
+        {(details || (done && completedBy)) && (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+            {details}
+            {details && done && completedBy && " · "}
             {done && completedBy && (
               <>
                 done by <PersonDot profile={completedBy} /> {completedBy.name}

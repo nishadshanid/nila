@@ -4,6 +4,7 @@ import type { RecurFreq } from "@/lib/types";
 export type RecurrenceRule = {
   freq: RecurFreq;
   by_weekday: number[] | null;
+  /** 1–31, or -1 for the last day of the month. */
   by_monthday: number | null;
   start_date: DateStr;
 };
@@ -18,8 +19,9 @@ export function occursOn(rule: RecurrenceRule, date: DateStr): boolean {
       return rule.by_weekday?.includes(isoWeekday(date)) ?? false;
     case "monthly": {
       if (!rule.by_monthday) return false;
-      // The 31st falls on the last day of shorter months.
-      const day = Math.min(rule.by_monthday, daysInMonth(date));
+      // -1 means the last day; the 31st also falls on the last day of shorter months.
+      const last = daysInMonth(date);
+      const day = rule.by_monthday === -1 ? last : Math.min(rule.by_monthday, last);
       return Number(date.slice(8, 10)) === day;
     }
   }
@@ -68,6 +70,23 @@ export function describeRule(rule: Pick<RecurrenceRule, "freq" | "by_weekday" | 
       return `Every ${days.map((d) => WEEKDAY_SHORT[d - 1]).join(", ")}`;
     }
     case "monthly":
-      return `Monthly on the ${ordinal(rule.by_monthday ?? 1)}`;
+      return rule.by_monthday === -1
+        ? "Monthly on the last day"
+        : `Monthly on the ${ordinal(rule.by_monthday ?? 1)}`;
   }
+}
+
+const TIMES = [
+  "",
+  "",
+  "Twice a day",
+  "3 times a day",
+  "4 times a day",
+  "5 times a day",
+  "6 times a day",
+];
+
+/** "" for once a day, otherwise "Twice a day" etc. */
+export function describeTimesPerDay(timesPerDay: number) {
+  return TIMES[timesPerDay] ?? `${timesPerDay} times a day`;
 }

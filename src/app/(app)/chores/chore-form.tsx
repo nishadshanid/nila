@@ -10,7 +10,7 @@ import { NativeSelect } from "@/components/native-select";
 import { Segmented } from "@/components/segmented";
 import { PersonDot } from "@/components/person-dot";
 import { personById, type Person } from "@/components/chores/people";
-import { CHORE_CATEGORIES, PRIORITIES } from "@/lib/chore-meta";
+import { CHORE_CATEGORIES, PRIORITIES, formatTime } from "@/lib/chore-meta";
 import { choreInputSchema, type ChoreInput } from "@/lib/chore-schema";
 import { addDays, formatDay, isoWeekday, type DateStr } from "@/lib/dates";
 import { planOccurrences } from "@/lib/rotation";
@@ -19,7 +19,9 @@ import { cn } from "@/lib/utils";
 import { saveChore } from "./actions";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const SLOT_NAMES = ["1st", "2nd", "3rd", "4th"];
 const PREVIEW_DAYS = 28;
+const PREVIEW_ITEMS = 8;
 
 type FormState = {
   title: string;
@@ -27,14 +29,15 @@ type FormState = {
   notes: string;
   priority: ChoreInput["priority"];
   assignment_type: AssignmentType;
-  fixed_assignee: string;
   first_turn: string;
   rotation_unit: RotationUnit;
   start_date: DateStr;
   freq: RecurFreq;
   by_weekday: number[];
+  month_mode: "day" | "last";
   by_monthday: string;
-  due_time: string;
+  times_per_day: number;
+  slot_times: string[];
   duration_min: string;
   remind_before_min: string;
 };
@@ -45,6 +48,7 @@ function initialState(
   today: DateStr,
   hasPartner: boolean,
 ): FormState {
+  const todayOfMonth = String(Number(today.slice(8, 10)));
   if (chore) {
     return {
       title: chore.title,
@@ -52,14 +56,19 @@ function initialState(
       notes: chore.notes ?? "",
       priority: chore.priority,
       assignment_type: chore.assignment_type,
-      fixed_assignee: chore.fixed_assignee ?? me.id,
       first_turn: chore.rotation_order?.[0] ?? me.id,
       rotation_unit: chore.rotation_unit,
       start_date: chore.start_date,
       freq: chore.freq,
       by_weekday: chore.by_weekday ?? [isoWeekday(today)],
-      by_monthday: String(chore.by_monthday ?? Number(today.slice(8, 10))),
-      due_time: chore.due_time?.slice(0, 5) ?? "",
+      month_mode: chore.by_monthday === -1 ? "last" : "day",
+      by_monthday:
+        chore.by_monthday && chore.by_monthday > 0 ? String(chore.by_monthday) : todayOfMonth,
+      times_per_day: chore.times_per_day,
+      slot_times: Array.from(
+        { length: chore.times_per_day },
+        (_, i) => chore.slot_times?.[i]?.slice(0, 5) ?? "",
+      ),
       duration_min: chore.duration_min?.toString() ?? "",
       remind_before_min: chore.remind_before_min?.toString() ?? "",
     };
@@ -70,14 +79,15 @@ function initialState(
     notes: "",
     priority: "med",
     assignment_type: hasPartner ? "rotating" : "fixed",
-    fixed_assignee: me.id,
     first_turn: me.id,
     rotation_unit: "per_week",
     start_date: today,
     freq: "weekly",
     by_weekday: [isoWeekday(today)],
-    by_monthday: String(Number(today.slice(8, 10))),
-    due_time: "",
+    month_mode: "day",
+    by_monthday: todayOfMonth,
+    times_per_day: 1,
+    slot_times: [""],
     duration_min: "",
     remind_before_min: "",
   };
@@ -85,7 +95,7 @@ function initialState(
 
 const toInt = (v: string) => (v.trim() === "" ? null : Number(v));
 
-function toInput(s: FormState, people: Person[]): ChoreInput {
+function toInput(s: FormState, people: Person[], me: Person): ChoreInput {
   const second = people.find((p) => p.id !== s.first_turn);
   return {
     title: s.title,
@@ -93,14 +103,16 @@ function toInput(s: FormState, people: Person[]): ChoreInput {
     notes: s.notes,
     priority: s.priority,
     assignment_type: s.assignment_type,
-    fixed_assignee: s.fixed_assignee,
+    // "Just me": the server also enforces this.
+    fixed_assignee: me.id,
     rotation_order: second ? [s.first_turn, second.id] : [s.first_turn],
     rotation_unit: s.rotation_unit,
     start_date: s.start_date,
     freq: s.freq,
     by_weekday: s.by_weekday,
-    by_monthday: toInt(s.by_monthday),
-    due_time: s.due_time,
+    by_monthday: s.month_mode === "last" ? -1 : toInt(s.by_monthday),
+    times_per_day: s.times_per_day,
+    slot_times: s.slot_times,
     duration_min: toInt(s.duration_min),
     remind_before_min: toInt(s.remind_before_min),
   };
@@ -120,6 +132,14 @@ function Field({
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
+  );
+}
+
+function PersonLabel({ person }: { person: Person }) {
+  return (
+    <>
+      <PersonDot profile={person} /> {person.name}
+    </>
   );
 }
 
@@ -143,12 +163,16 @@ export function ChoreForm({
     setState((s) => ({ ...s, [key]: value }));
 
   const hasPartner = people.length > 1;
-  const parsed = useMemo(() => choreInputSchema.safeParse(toInput(state, people)), [state, people]);
+  const input = useMemo(() => toInput(state, people, me), [state, people, me]);
+  const parsed = useMemo(() => choreInputSchema.safeParse(input), [input]);
 
   const preview = useMemo(() => {
     if (!parsed.success) return [];
     const from = parsed.data.start_date > today ? parsed.data.start_date : today;
-    return planOccurrences(parsed.data, from, addDays(from, PREVIEW_DAYS - 1)).slice(0, 8);
+    return planOccurrences(parsed.data, from, addDays(from, PREVIEW_DAYS - 1)).slice(
+      0,
+      PREVIEW_ITEMS,
+    );
   }, [parsed, today]);
 
   function toggleWeekday(day: number) {
@@ -160,6 +184,23 @@ export function ChoreForm({
     );
   }
 
+  function setTimesPerDay(n: number) {
+    setState((s) => ({
+      ...s,
+      times_per_day: n,
+      slot_times: Array.from({ length: n }, (_, i) => s.slot_times[i] ?? ""),
+      // "Every day" only makes sense with several times a day.
+      rotation_unit: n === 1 && s.rotation_unit === "per_day" ? "per_occurrence" : s.rotation_unit,
+    }));
+  }
+
+  function setSlotTime(slot: number, value: string) {
+    setState((s) => ({
+      ...s,
+      slot_times: s.slot_times.map((t, i) => (i === slot ? value : t)),
+    }));
+  }
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!parsed.success) {
@@ -168,7 +209,7 @@ export function ChoreForm({
     }
     setError(null);
     startTransition(async () => {
-      const result = await saveChore(toInput(state, people), chore?.id);
+      const result = await saveChore(input, chore?.id);
       if (result.ok) {
         toast.success(chore ? "Chore updated" : "Chore added");
         onDone();
@@ -177,6 +218,8 @@ export function ChoreForm({
       }
     });
   }
+
+  const multi = state.times_per_day > 1;
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-5">
@@ -221,64 +264,6 @@ export function ChoreForm({
         </Field>
       </div>
 
-      <Field label="Who does it">
-        <Segmented
-          aria-label="Who does it"
-          value={state.assignment_type}
-          onChange={(v) => set("assignment_type", v)}
-          options={[
-            ...(hasPartner ? [{ value: "rotating" as const, label: "Take turns" }] : []),
-            { value: "fixed", label: "One person" },
-            { value: "together", label: "Together" },
-          ]}
-        />
-        {state.assignment_type === "fixed" && (
-          <Segmented
-            aria-label="Person"
-            value={state.fixed_assignee}
-            onChange={(v) => set("fixed_assignee", v)}
-            options={people.map((p) => ({
-              value: p.id,
-              label: (
-                <>
-                  <PersonDot profile={p} /> {p.name}
-                </>
-              ),
-            }))}
-          />
-        )}
-        {state.assignment_type === "rotating" && (
-          <div className="flex flex-col gap-3 rounded-lg border p-3">
-            <Field label="First turn">
-              <Segmented
-                aria-label="First turn"
-                value={state.first_turn}
-                onChange={(v) => set("first_turn", v)}
-                options={people.map((p) => ({
-                  value: p.id,
-                  label: (
-                    <>
-                      <PersonDot profile={p} /> {p.name}
-                    </>
-                  ),
-                }))}
-              />
-            </Field>
-            <Field label="Switch turns">
-              <Segmented
-                aria-label="Switch turns"
-                value={state.rotation_unit}
-                onChange={(v) => set("rotation_unit", v)}
-                options={[
-                  { value: "per_week", label: "Every week" },
-                  { value: "per_occurrence", label: "Every time" },
-                ]}
-              />
-            </Field>
-          </div>
-        )}
-      </Field>
-
       <Field label="How often">
         <Segmented
           aria-label="How often"
@@ -315,18 +300,111 @@ export function ChoreForm({
           </div>
         )}
         {state.freq === "monthly" && (
-          <div className="flex items-center gap-2 text-sm">
-            On day
-            <Input
-              type="number"
-              min={1}
-              max={31}
-              value={state.by_monthday}
-              onChange={(e) => set("by_monthday", e.target.value)}
-              className="w-20"
+          <div className="flex flex-col gap-2">
+            <Segmented
               aria-label="Day of the month"
+              value={state.month_mode}
+              onChange={(v) => set("month_mode", v)}
+              options={[
+                { value: "day", label: "On a date" },
+                { value: "last", label: "Last day of month" },
+              ]}
             />
-            of each month
+            {state.month_mode === "day" ? (
+              <div className="flex items-center gap-2 text-sm">
+                On day
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={state.by_monthday}
+                  onChange={(e) => set("by_monthday", e.target.value)}
+                  className="w-20"
+                  aria-label="Day of the month"
+                />
+                of each month
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                Falls on the 28th, 29th, 30th or 31st, whichever is the last day.
+              </p>
+            )}
+          </div>
+        )}
+      </Field>
+
+      <Field label="Times a day">
+        <Segmented
+          aria-label="Times a day"
+          value={String(state.times_per_day)}
+          onChange={(v) => setTimesPerDay(Number(v))}
+          options={[
+            { value: "1", label: "Once" },
+            { value: "2", label: "Twice" },
+            { value: "3", label: "3×" },
+            { value: "4", label: "4×" },
+          ]}
+        />
+        <div className={cn("grid gap-2", multi && "grid-cols-2")}>
+          {state.slot_times.map((time, slot) => (
+            <div key={slot} className="flex flex-col gap-1">
+              <Label htmlFor={`slot-${slot}`} className="text-muted-foreground text-xs font-normal">
+                {multi ? `${SLOT_NAMES[slot]} time (optional)` : "Time (optional)"}
+              </Label>
+              <Input
+                id={`slot-${slot}`}
+                type="time"
+                value={time}
+                onChange={(e) => setSlotTime(slot, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Who does it">
+        <Segmented
+          aria-label="Who does it"
+          value={state.assignment_type}
+          onChange={(v) => set("assignment_type", v)}
+          options={[
+            ...(hasPartner ? [{ value: "rotating" as const, label: "Take turns" }] : []),
+            { value: "fixed", label: "Just me" },
+            ...(hasPartner ? [{ value: "together" as const, label: "Together" }] : []),
+          ]}
+        />
+        {state.assignment_type === "rotating" && (
+          <div className="flex flex-col gap-3 rounded-lg border p-3">
+            <Field label="First turn">
+              <Segmented
+                aria-label="First turn"
+                value={state.first_turn}
+                onChange={(v) => set("first_turn", v)}
+                options={people.map((p) => ({ value: p.id, label: <PersonLabel person={p} /> }))}
+              />
+            </Field>
+            <Field label="Switch turns">
+              <Segmented
+                aria-label="Switch turns"
+                value={state.rotation_unit}
+                onChange={(v) => set("rotation_unit", v)}
+                options={[
+                  { value: "per_occurrence", label: "Every time" },
+                  ...(multi ? [{ value: "per_day" as const, label: "Every day" }] : []),
+                  { value: "per_week", label: "Every week" },
+                ]}
+              />
+              <p className="text-muted-foreground text-xs">
+                {state.rotation_unit === "per_occurrence" &&
+                  (multi
+                    ? "Each time it happens, the other person does it."
+                    : "Each time it happens, it's the other person's turn.")}
+                {state.rotation_unit === "per_day" &&
+                  "One person does all of it that day, the other the next day."}
+                {state.rotation_unit === "per_week" &&
+                  "One person does it the whole week (Mon–Sun), then you swap."}
+              </p>
+            </Field>
           </div>
         )}
       </Field>
@@ -339,14 +417,6 @@ export function ChoreForm({
             value={state.start_date}
             onChange={(e) => set("start_date", e.target.value)}
             required
-          />
-        </Field>
-        <Field label="Time (optional)" htmlFor="due_time">
-          <Input
-            id="due_time"
-            type="time"
-            value={state.due_time}
-            onChange={(e) => set("due_time", e.target.value)}
           />
         </Field>
         <Field label="Takes (minutes)" htmlFor="duration_min">
@@ -384,7 +454,7 @@ export function ChoreForm({
       </Field>
 
       <div className="bg-muted/50 rounded-lg p-3">
-        <p className="mb-2 text-sm font-medium">Next 4 weeks</p>
+        <p className="mb-2 text-sm font-medium">Coming up</p>
         {preview.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             {parsed.success
@@ -395,17 +465,15 @@ export function ChoreForm({
           <ul className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
             {preview.map((o) => {
               const person = personById(people, o.assignee_id);
+              const when = formatTime(o.due_time) ?? (multi ? SLOT_NAMES[o.slot] : null);
               return (
-                <li key={o.date} className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">{formatDay(o.date)}</span>
+                <li key={`${o.date}-${o.slot}`} className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">
+                    {formatDay(o.date)}
+                    {when && ` · ${when}`}
+                  </span>
                   <span className="flex items-center gap-1.5">
-                    {person ? (
-                      <>
-                        <PersonDot profile={person} /> {person.name}
-                      </>
-                    ) : (
-                      "Together"
-                    )}
+                    {person ? <PersonLabel person={person} /> : "Together"}
                   </span>
                 </li>
               );

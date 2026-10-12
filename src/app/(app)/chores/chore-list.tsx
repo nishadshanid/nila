@@ -18,7 +18,7 @@ import { personById, type Person } from "@/components/chores/people";
 import { PersonDot } from "@/components/person-dot";
 import { categoryMeta, formatTime, priorityMeta } from "@/lib/chore-meta";
 import { addDays, formatDay, type DateStr } from "@/lib/dates";
-import { describeRule } from "@/lib/recurrence";
+import { describeRule, describeTimesPerDay } from "@/lib/recurrence";
 import { planOccurrences } from "@/lib/rotation";
 import type { Chore } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,14 @@ import { ChoreForm } from "./chore-form";
 import { deleteChore, setChoreActive, type ActionResult } from "./actions";
 
 type Editing = { chore?: Chore } | null;
+
+/** "Every Mon · Twice a day · 9:00 AM, 8:00 PM" */
+function scheduleSummary(chore: Chore) {
+  const times = (chore.slot_times ?? []).map(formatTime).filter(Boolean);
+  return [describeRule(chore), describeTimesPerDay(chore.times_per_day), times.join(", ")]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 function NextUp({ chore, people, today }: { chore: Chore; people: Person[]; today: DateStr }) {
   const from = chore.start_date > today ? chore.start_date : today;
@@ -116,10 +124,7 @@ export function ChoreList({
                     {!chore.active && <Badge variant="secondary">Paused</Badge>}
                   </div>
                   <div className="text-muted-foreground mt-1 flex flex-col gap-1 text-xs">
-                    <span>
-                      {describeRule(chore)}
-                      {chore.due_time && ` at ${formatTime(chore.due_time)}`}
-                    </span>
+                    <span>{scheduleSummary(chore)}</span>
                     <AssignmentSummary chore={chore} people={people} />
                     {chore.active && <NextUp chore={chore} people={people} today={today} />}
                   </div>

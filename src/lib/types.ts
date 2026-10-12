@@ -16,7 +16,7 @@ export type Person = Pick<Profile, "id" | "name" | "color">;
 
 export type Priority = "low" | "med" | "high";
 export type AssignmentType = "fixed" | "rotating" | "together";
-export type RotationUnit = "per_week" | "per_occurrence";
+export type RotationUnit = "per_week" | "per_day" | "per_occurrence";
 export type RecurFreq = "daily" | "weekly" | "monthly";
 export type OccStatus = "pending" | "done" | "skipped";
 
@@ -33,8 +33,11 @@ export type Chore = {
   start_date: string;
   freq: RecurFreq;
   by_weekday: number[] | null;
+  /** 1–31, or -1 for the last day of the month. */
   by_monthday: number | null;
-  due_time: string | null;
+  times_per_day: number;
+  /** One entry per slot; null means no set time for that slot. */
+  slot_times: (string | null)[] | null;
   duration_min: number | null;
   remind_before_min: number | null;
   active: boolean;
@@ -47,6 +50,8 @@ export type ChoreOccurrence = {
   id: string;
   chore_id: string;
   date: string;
+  slot: number;
+  due_time: string | null;
   assignee_id: string | null;
   original_assignee_id: string | null;
   status: OccStatus;

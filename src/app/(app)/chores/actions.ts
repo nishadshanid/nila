@@ -19,9 +19,19 @@ export async function saveChore(input: ChoreInput, id?: string): Promise<ActionR
 
   try {
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "You're signed out." };
+
+    // "One person" always means you: you can't assign a chore only to your partner.
+    const values = {
+      ...parsed.data,
+      fixed_assignee: parsed.data.assignment_type === "fixed" ? user.id : null,
+    };
     const query = id
-      ? supabase.from("chores").update(parsed.data).eq("id", id).select("id").single()
-      : supabase.from("chores").insert(parsed.data).select("id").single();
+      ? supabase.from("chores").update(values).eq("id", id).select("id").single()
+      : supabase.from("chores").insert(values).select("id").single();
     const { data, error } = await query;
     if (error) return { ok: false, error: error.message };
 
@@ -61,6 +71,17 @@ export async function setOccurrenceDone(id: string, done: boolean): Promise<Acti
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You're signed out." };
+
+  // You tick off your own and together chores; your partner's are theirs.
+  const { data: occurrence, error: loadError } = await supabase
+    .from("chore_occurrences")
+    .select("assignee_id")
+    .eq("id", id)
+    .single();
+  if (loadError) return { ok: false, error: loadError.message };
+  if (occurrence.assignee_id && occurrence.assignee_id !== user.id) {
+    return { ok: false, error: "Only the person doing this chore can tick it off." };
+  }
 
   const { error } = await supabase
     .from("chore_occurrences")

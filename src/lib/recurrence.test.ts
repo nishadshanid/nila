@@ -63,4 +63,21 @@ describe("recurrence", () => {
     );
     expect(describeRule({ freq: "daily", by_weekday: null, by_monthday: null })).toBe("Every day");
   });
+
+  it("last day of the month", () => {
+    const rule: RecurrenceRule = {
+      freq: "monthly",
+      by_weekday: null,
+      by_monthday: -1,
+      start_date: "2026-01-01",
+    };
+    expect(datesInRange(rule, "2026-01-01", "2026-04-30")).toEqual([
+      "2026-01-31",
+      "2026-02-28",
+      "2026-03-31",
+      "2026-04-30",
+    ]);
+    expect(occursOn(rule, "2028-02-29")).toBe(true);
+    expect(describeRule(rule)).toBe("Monthly on the last day");
+  });
 });

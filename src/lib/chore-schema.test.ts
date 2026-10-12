@@ -17,7 +17,8 @@ const base: ChoreInput = {
   freq: "weekly",
   by_weekday: [1],
   by_monthday: 12,
-  due_time: "",
+  times_per_day: 1,
+  slot_times: [""],
   duration_min: null,
   remind_before_min: null,
 };
@@ -25,16 +26,18 @@ const base: ChoreInput = {
 describe("choreInputSchema", () => {
   it("treats empty optional fields as null", () => {
     const parsed = choreInputSchema.parse(base);
-    expect(parsed.due_time).toBeNull();
+    expect(parsed.slot_times).toBeNull();
     expect(parsed.notes).toBeNull();
   });
 
   it("accepts a time", () => {
-    expect(choreInputSchema.parse({ ...base, due_time: "07:30" }).due_time).toBe("07:30");
+    expect(choreInputSchema.parse({ ...base, slot_times: ["07:30"] }).slot_times).toEqual([
+      "07:30",
+    ]);
   });
 
   it("rejects a malformed time", () => {
-    expect(choreInputSchema.safeParse({ ...base, due_time: "7pm" }).success).toBe(false);
+    expect(choreInputSchema.safeParse({ ...base, slot_times: ["7pm"] }).success).toBe(false);
   });
 
   it("drops fields that don't apply", () => {
@@ -46,5 +49,18 @@ describe("choreInputSchema", () => {
 
   it("needs weekdays for weekly chores", () => {
     expect(choreInputSchema.safeParse({ ...base, by_weekday: [] }).success).toBe(false);
+  });
+
+  it("keeps per-slot times, with gaps as null", () => {
+    const parsed = choreInputSchema.parse({ ...base, times_per_day: 2, slot_times: ["", "20:00"] });
+    expect(parsed.slot_times).toEqual([null, "20:00"]);
+  });
+
+  it("accepts the last day of the month", () => {
+    const parsed = choreInputSchema.parse({ ...base, freq: "monthly", by_monthday: -1 });
+    expect(parsed.by_monthday).toBe(-1);
+    expect(choreInputSchema.safeParse({ ...base, freq: "monthly", by_monthday: 0 }).success).toBe(
+      false,
+    );
   });
 });

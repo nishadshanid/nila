@@ -26,6 +26,8 @@ export async function materialize(
     planOccurrences(chore, from, to).map((o) => ({
       chore_id: chore.id,
       date: o.date,
+      slot: o.slot,
+      due_time: o.due_time,
       assignee_id: o.assignee_id,
       original_assignee_id: o.assignee_id,
     })),
@@ -34,7 +36,7 @@ export async function materialize(
 
   const { error: upsertError } = await supabase
     .from("chore_occurrences")
-    .upsert(rows, { onConflict: "chore_id,date", ignoreDuplicates: true });
+    .upsert(rows, { onConflict: "chore_id,date,slot", ignoreDuplicates: true });
   if (upsertError) throw new Error(`Could not create chore occurrences: ${upsertError.message}`);
 }
 

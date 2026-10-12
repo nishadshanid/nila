@@ -3,7 +3,13 @@ import type { Chore } from "@/lib/types";
 import { PersonDot } from "@/components/person-dot";
 import { personById, type Person } from "./people";
 
-/** "Rotates weekly: A → B", "Fixed: A", or "Together". */
+const ROTATION_LABEL: Record<Chore["rotation_unit"], string> = {
+  per_week: "Turns every week",
+  per_day: "Turns every day",
+  per_occurrence: "Turns every time",
+};
+
+/** "Turns every week: A → B", "Just you", or "Together". */
 export function AssignmentSummary({ chore, people }: { chore: Chore; people: Person[] }) {
   if (chore.assignment_type === "together") {
     return (
@@ -13,10 +19,9 @@ export function AssignmentSummary({ chore, people }: { chore: Chore; people: Per
     );
   }
   if (chore.assignment_type === "fixed") {
-    const person = personById(people, chore.fixed_assignee);
     return (
       <span className="inline-flex items-center gap-1.5">
-        <User className="size-3.5" /> Always {person?.name ?? "someone"}
+        <User className="size-3.5" /> Just you
       </span>
     );
   }
@@ -26,7 +31,7 @@ export function AssignmentSummary({ chore, people }: { chore: Chore; people: Per
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <Repeat className="size-3.5" />
-      {chore.rotation_unit === "per_week" ? "Rotates weekly" : "Takes turns"}:
+      {ROTATION_LABEL[chore.rotation_unit]}:
       {order.map((p, i) => (
         <span key={p.id} className="inline-flex items-center gap-1">
           {i > 0 && "→"} <PersonDot profile={p} /> {p.name}
