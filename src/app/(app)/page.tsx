@@ -14,7 +14,11 @@ import { ChoreCard } from "@/components/chores/chore-card";
 import { FlexibleCard } from "@/components/chores/flexible-card";
 import { PersonDot } from "@/components/person-dot";
 import { getLeavesOn } from "@/lib/leaves";
-import type { Leave, Person } from "@/lib/types";
+import { getRemindersForDay, type DayReminder } from "@/lib/reminders";
+import { getTasksForDay } from "@/lib/tasks";
+import { TaskRow } from "@/components/tasks/task-row";
+import { DayReminderRow } from "@/components/reminders/day-reminder";
+import type { Leave, Person, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type View = "mine" | "couple";
@@ -217,6 +221,52 @@ function LeaveBanner({
   );
 }
 
+function ReminderSection({ items }: { items: DayReminder[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-sm font-semibold">Reminders</h2>
+      <ul className="flex flex-col gap-2">
+        {items.map((item) => (
+          <DayReminderRow key={`${item.reminder.id}-${item.date}`} item={item} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function TaskSection({
+  title,
+  tasks,
+  people,
+  meId,
+  today,
+}: {
+  title: string;
+  tasks: Task[];
+  people: Person[];
+  meId: string;
+  today: DateStr;
+}) {
+  if (tasks.length === 0) return null;
+  const done = tasks.filter((t) => t.status === "done").length;
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        {title}
+        <span className="text-muted-foreground font-normal">
+          {done}/{tasks.length}
+        </span>
+      </h2>
+      <ul className="flex flex-col gap-2">
+        {tasks.map((task) => (
+          <TaskRow key={task.id} task={task} people={people} meId={meId} today={today} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function FlexibleSection({
   items,
   date,
@@ -260,10 +310,12 @@ async function Today({
   const today = todayIST(now);
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today;
   const view: View = params.view === "couple" && partner ? "couple" : "mine";
-  const [occurrences, flexible, leaves] = await Promise.all([
+  const [occurrences, flexible, leaves, tasks, reminders] = await Promise.all([
     getChoresForDay(date),
     getFlexibleForDay(date),
     getLeavesOn(date),
+    getTasksForDay(date, today),
+    getRemindersForDay(date),
   ]);
   // Mine: what you do today. Couple: only shared chores (together and taking turns);
   // "just me" chores stay private to each of you.
@@ -284,7 +336,26 @@ async function Today({
   // In the Couple view, a together chore stays under "Together" even when one of
   // you is covering it alone.
   const togetherShared = occurrences.filter((o) => o.chore.assignment_type === "together");
+
+  // Todos & plans: Mine shows your private ones plus couple ones for you or both;
+  // Couple shows only couple ones.
+  const forView = (t: Task) =>
+    view === "couple"
+      ? t.visibility === "couple"
+      : t.visibility === "personal" || t.assignee_id === null || t.assignee_id === me.id;
+  const todos = tasks.filter((t) => t.kind === "todo" && forView(t));
+  const plans = tasks.filter((t) => t.kind === "plan" && forView(t));
+  const dayReminders = reminders.filter(
+    (r) => view === "mine" || r.reminder.visibility === "couple",
+  );
+
   const visible = view === "couple" ? shared : [...mine, ...together, ...handedOver];
+  const nothing =
+    visible.length === 0 &&
+    visibleFlexible.length === 0 &&
+    todos.length === 0 &&
+    plans.length === 0 &&
+    dayReminders.length === 0;
 
   return (
     <>
@@ -303,11 +374,18 @@ async function Today({
       <DayNav date={date} today={today} view={view} />
       <LeaveBanner leaves={leaves} me={me} partner={partner} />
 
-      {visible.length === 0 && visibleFlexible.length === 0 ? (
+      <ReminderSection items={dayReminders} />
+      <TaskSection title="Plans" tasks={plans} people={people} meId={me.id} today={today} />
+
+      {nothing ? (
         <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
-          {view === "mine" ? "Nothing for you on this day." : "No shared chores on this day."}{" "}
+          {view === "mine" ? "Nothing for you on this day." : "Nothing shared on this day."}{" "}
+          <Link href="/tasks" className="underline">
+            Add a todo
+          </Link>{" "}
+          or{" "}
           <Link href="/chores" className="underline">
-            Set up chores
+            set up chores
           </Link>
         </div>
       ) : view === "mine" ? (
@@ -327,6 +405,7 @@ async function Today({
             meId={me.id}
             handedOver
           />
+          <TaskSection title="Todos" tasks={todos} people={people} meId={me.id} today={today} />
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       ) : (
@@ -344,6 +423,13 @@ async function Today({
             people={people}
             meId={me.id}
             showTurn
+          />
+          <TaskSection
+            title="Couple todos"
+            tasks={todos}
+            people={people}
+            meId={me.id}
+            today={today}
           />
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>

@@ -1,17 +1,32 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { Bell } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { ComingSoon } from "@/components/coming-soon";
+import { todayIST } from "@/lib/dates";
+import { getHousehold } from "@/lib/household";
+import { getReminders } from "@/lib/reminders";
+import { ReminderList } from "./reminder-list";
 
 export const metadata: Metadata = { title: "Reminders" };
 
-export default function Page() {
+async function Reminders() {
+  const [{ me, partner }, reminders] = await Promise.all([getHousehold(), getReminders()]);
+  return (
+    <ReminderList
+      reminders={reminders}
+      meId={me.id}
+      hasPartner={partner !== null}
+      today={todayIST()}
+    />
+  );
+}
+
+export default function RemindersPage() {
   return (
     <>
-      <PageHeader title="Reminders" description="Birthdays, calls and other recurring reminders." />
-      <ComingSoon icon={Bell} phase={3}>
-        Birthdays, anniversaries, calling parents and custom recurring reminders.
-      </ComingSoon>
+      <PageHeader title="Reminders" description="Birthdays, anniversaries, calls and more." />
+      <Suspense fallback={<div className="bg-muted h-40 animate-pulse rounded-xl" />}>
+        <Reminders />
+      </Suspense>
     </>
   );
 }

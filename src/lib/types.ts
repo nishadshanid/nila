@@ -81,3 +81,52 @@ export type Leave = {
   created_at: string;
   updated_at: string;
 };
+
+export type Visibility = "personal" | "couple";
+export type TaskKind = "todo" | "plan";
+export type TaskStatus = "open" | "done";
+
+export type Task = {
+  id: string;
+  kind: TaskKind;
+  title: string;
+  notes: string | null;
+  priority: Priority;
+  visibility: Visibility;
+  owner_id: string;
+  /** Couple tasks: who does it. Null = both of you. */
+  assignee_id: string | null;
+  /** Todo: due date (optional). Plan: the day it starts. */
+  date: string | null;
+  time: string | null;
+  end_date: string | null;
+  duration_min: number | null;
+  remind_before_min: number | null;
+  status: TaskStatus;
+  completed_by: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReminderType = "birthday" | "anniversary" | "call" | "custom";
+export type ReminderFreq = "once" | "daily" | "weekly" | "monthly" | "yearly";
+
+export type Reminder = {
+  id: string;
+  title: string;
+  type: ReminderType;
+  freq: ReminderFreq;
+  start_date: string;
+  interval_days: number;
+  by_weekday: number[] | null;
+  by_monthday: number | null;
+  time: string | null;
+  lead_days: number;
+  notes: string | null;
+  visibility: Visibility;
+  owner_id: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};

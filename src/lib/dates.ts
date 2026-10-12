@@ -66,3 +66,12 @@ export function formatDay(date: DateStr, pattern = "EEE, d MMM"): string {
   const d = new Date(toUTC(date));
   return format(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), pattern);
 }
+
+/** "Today", "Tomorrow", "Yesterday", or "Mon, 12 Oct". */
+export function relativeDay(date: DateStr, today: DateStr): string {
+  const diff = daysBetween(today, date);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff === -1) return "Yesterday";
+  return formatDay(date, date.slice(0, 4) === today.slice(0, 4) ? "EEE, d MMM" : "d MMM yyyy");
+}
