@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight } from "lucide-react";
 import { getHousehold } from "@/lib/household";
 import {
   getChoresForDay,
@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { ChoreCard } from "@/components/chores/chore-card";
 import { FlexibleCard } from "@/components/chores/flexible-card";
 import { PersonDot } from "@/components/person-dot";
-import type { Person } from "@/lib/types";
+import { getLeavesOn } from "@/lib/leaves";
+import type { Leave, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type View = "mine" | "couple";
@@ -95,7 +96,9 @@ function ViewSwitch({ date, today, view }: { date: DateStr; today: DateStr; view
   );
 }
 
-function Progress({ occurrences }: { occurrences: OccurrenceWithChore[] }) {
+function Progress({ occurrences: all }: { occurrences: OccurrenceWithChore[] }) {
+  const occurrences = all.filter((o) => o.status !== "skipped");
+  if (occurrences.length === 0) return null;
   const done = occurrences.filter((o) => o.status === "done").length;
   const percent = Math.round((done / occurrences.length) * 100);
   return (
@@ -129,6 +132,7 @@ function ChoreSection({
   people,
   meId,
   showTurn = false,
+  handedOver = false,
 }: {
   title: string;
   person?: Person;
@@ -137,16 +141,19 @@ function ChoreSection({
   meId: string;
   /** Show whose turn it is on each card (for rotating chores). */
   showTurn?: boolean;
+  /** Chores you handed to your partner: read-only, with "Take back". */
+  handedOver?: boolean;
 }) {
   if (occurrences.length === 0) return null;
-  const done = occurrences.filter((o) => o.status === "done").length;
+  const active = occurrences.filter((o) => o.status !== "skipped");
+  const done = active.filter((o) => o.status === "done").length;
   return (
     <section className="mb-6">
       <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
         {person && <PersonDot profile={person} />}
         {title}
         <span className="text-muted-foreground font-normal">
-          {done}/{occurrences.length}
+          {done}/{active.length}
         </span>
       </h2>
       <ul className="flex flex-col gap-2">
@@ -155,13 +162,58 @@ function ChoreSection({
             key={o.id}
             occurrence={o}
             people={people}
+            meId={meId}
             showTurn={showTurn}
+            canTakeBack={handedOver}
             // Only the person whose turn it is can tick it; together chores are anyone's.
             readOnly={o.assignee_id !== null && o.assignee_id !== meId}
           />
         ))}
       </ul>
     </section>
+  );
+}
+
+function LeaveBanner({
+  leaves,
+  me,
+  partner,
+}: {
+  leaves: Leave[];
+  me: Person;
+  partner: Person | null;
+}) {
+  if (leaves.length === 0) return null;
+  const word = { away: "away", sick: "sick", other: "on leave" } as const;
+  return (
+    <div className="mb-4 flex flex-col gap-2">
+      {leaves.map((leave) => {
+        const isMe = leave.user_id === me.id;
+        const until = `until ${formatDay(leave.end_date, "EEE, d MMM")}`;
+        return (
+          <Link
+            key={leave.id}
+            href="/leave"
+            className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+          >
+            <CalendarOff className="mt-0.5 size-4 shrink-0" />
+            <span>
+              {isMe ? (
+                <>
+                  You&apos;re {word[leave.type]} {until}.{" "}
+                  {partner ? `${partner.name} has your shared chores; your own are paused.` : ""}
+                </>
+              ) : (
+                <>
+                  {partner?.name ?? "Your partner"} is {word[leave.type]} {until}. You&apos;re
+                  covering the shared chores.
+                </>
+              )}
+            </span>
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
@@ -208,9 +260,10 @@ async function Today({
   const today = todayIST(now);
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today;
   const view: View = params.view === "couple" && partner ? "couple" : "mine";
-  const [occurrences, flexible] = await Promise.all([
+  const [occurrences, flexible, leaves] = await Promise.all([
     getChoresForDay(date),
     getFlexibleForDay(date),
+    getLeavesOn(date),
   ]);
   // Mine: what you do today. Couple: only shared chores (together and taking turns);
   // "just me" chores stay private to each of you.
@@ -223,9 +276,15 @@ async function Today({
 
   const mine = occurrences.filter((o) => o.assignee_id === me.id);
   const together = occurrences.filter((o) => o.assignee_id === null);
+  const handedOver = occurrences.filter(
+    (o) => o.reassign_reason === "split" && o.reassigned_by === me.id && o.assignee_id !== me.id,
+  );
   const turns = occurrences.filter((o) => o.chore.assignment_type === "rotating");
   const shared = occurrences.filter((o) => isShared(o.chore));
-  const visible = view === "couple" ? shared : [...mine, ...together];
+  // In the Couple view, a together chore stays under "Together" even when one of
+  // you is covering it alone.
+  const togetherShared = occurrences.filter((o) => o.chore.assignment_type === "together");
+  const visible = view === "couple" ? shared : [...mine, ...together, ...handedOver];
 
   return (
     <>
@@ -242,6 +301,7 @@ async function Today({
 
       {partner && <ViewSwitch date={date} today={today} view={view} />}
       <DayNav date={date} today={today} view={view} />
+      <LeaveBanner leaves={leaves} me={me} partner={partner} />
 
       {visible.length === 0 && visibleFlexible.length === 0 ? (
         <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
@@ -260,12 +320,24 @@ async function Today({
             meId={me.id}
           />
           <ChoreSection title="Together" occurrences={together} people={people} meId={me.id} />
+          <ChoreSection
+            title={`Handed to ${partner?.name ?? "partner"}`}
+            occurrences={handedOver}
+            people={people}
+            meId={me.id}
+            handedOver
+          />
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       ) : (
         <>
           {shared.length > 0 && <Progress occurrences={shared} />}
-          <ChoreSection title="Together" occurrences={together} people={people} meId={me.id} />
+          <ChoreSection
+            title="Together"
+            occurrences={togetherShared}
+            people={people}
+            meId={me.id}
+          />
           <ChoreSection
             title="Taking turns"
             occurrences={turns}

@@ -143,3 +143,80 @@ export async function logFlexibleChore(
   refresh();
   return { ok: true };
 }
+
+/**
+ * "Can't do it": hands one of your chores for one day to your partner, with a
+ * short reason they can see.
+ */
+export async function handOverOccurrence(id: string, reason: string): Promise<ActionResult> {
+  const note = reason.trim().slice(0, 300);
+  if (!note) return { ok: false, error: "Add a short reason" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You're signed out." };
+
+  const [{ data: row, error: loadError }, { data: partner, error: partnerError }] =
+    await Promise.all([
+      supabase.from("chore_occurrences").select("assignee_id, status").eq("id", id).single(),
+      supabase.from("profiles").select("id").neq("id", user.id).maybeSingle(),
+    ]);
+  if (loadError) return { ok: false, error: loadError.message };
+  if (partnerError) return { ok: false, error: partnerError.message };
+  if (!partner) return { ok: false, error: "There's no partner to hand it to yet." };
+  if (row.status !== "pending")
+    return { ok: false, error: "Only chores still to do can be handed over." };
+  if (row.assignee_id && row.assignee_id !== user.id) {
+    return { ok: false, error: "You can only hand over your own chores." };
+  }
+
+  const { error } = await supabase
+    .from("chore_occurrences")
+    .update({
+      assignee_id: partner.id,
+      reassign_reason: "split",
+      reassign_note: note,
+      reassigned_by: user.id,
+      reassigned_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+/** Takes back a chore you handed over, if your partner hasn't done it yet. */
+export async function takeBackOccurrence(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You're signed out." };
+
+  const { data: row, error: loadError } = await supabase
+    .from("chore_occurrences")
+    .select("status, reassign_reason, reassigned_by, original_assignee_id")
+    .eq("id", id)
+    .single();
+  if (loadError) return { ok: false, error: loadError.message };
+  if (row.reassign_reason !== "split" || row.reassigned_by !== user.id) {
+    return { ok: false, error: "Only the person who handed it over can take it back." };
+  }
+  if (row.status !== "pending") return { ok: false, error: "It's already done." };
+
+  const { error } = await supabase
+    .from("chore_occurrences")
+    .update({
+      assignee_id: row.original_assignee_id,
+      reassign_reason: null,
+      reassign_note: null,
+      reassigned_by: null,
+      reassigned_at: null,
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}

@@ -1,20 +1,34 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { CalendarOff } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { ComingSoon } from "@/components/coming-soon";
+import { todayIST } from "@/lib/dates";
+import { getHousehold } from "@/lib/household";
+import { getCoverCounts, getLeaves } from "@/lib/leaves";
+import { LeaveList } from "./leave-list";
 
 export const metadata: Metadata = { title: "Leave" };
 
-export default function Page() {
+async function Leaves() {
+  const [{ people }, leaves, covers] = await Promise.all([
+    getHousehold(),
+    getLeaves(),
+    getCoverCounts(),
+  ]);
+  return (
+    <LeaveList leaves={leaves} people={people} me={people[0]} today={todayIST()} covers={covers} />
+  );
+}
+
+export default function LeavePage() {
   return (
     <>
       <PageHeader
         title="Leave"
-        description="Away or sick days. Chores move to your partner automatically."
+        description="Away or sick days. Shared chores move to the other person; your own chores pause."
       />
-      <ComingSoon icon={CalendarOff} phase={2}>
-        Add leave or sick days, and your chores move to your partner for those days.
-      </ComingSoon>
+      <Suspense fallback={<div className="bg-muted h-40 animate-pulse rounded-xl" />}>
+        <Leaves />
+      </Suspense>
     </>
   );
 }

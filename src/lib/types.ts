@@ -58,6 +58,26 @@ export type ChoreOccurrence = {
   status: OccStatus;
   completed_by: string | null;
   completed_at: string | null;
-  reassign_reason: string | null;
+  reassign_reason: ReassignReason | null;
+  reassign_note: string | null;
+  reassigned_by: string | null;
+  reassigned_at: string | null;
   created_at: string;
+};
+
+/** leave / sick: moved or paused by a leave. split: handed over by hand. */
+export type ReassignReason = "leave" | "sick" | "split";
+
+export type LeaveType = "away" | "sick" | "other";
+
+export type Leave = {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  type: LeaveType;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 };
