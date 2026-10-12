@@ -2,9 +2,14 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile } from "@/lib/types";
+import type { Person, Profile } from "@/lib/types";
 
-export type Household = { me: Profile; partner: Profile | null };
+export type Household = {
+  me: Profile;
+  partner: Profile | null;
+  /** Both of you, me first: just what client components need. */
+  people: Person[];
+};
 
 /** The signed-in partner and the other partner. Cached per request. */
 export const getHousehold = cache(async (): Promise<Household> => {
@@ -24,5 +29,9 @@ export const getHousehold = cache(async (): Promise<Household> => {
       "No profile row for this user. Run the Supabase migrations (npx supabase db push).",
     );
   }
-  return { me, partner: profiles.find((p) => p.id !== user.id) ?? null };
+  const partner = profiles.find((p) => p.id !== user.id) ?? null;
+  const people = [me, partner]
+    .filter((p): p is Profile => p !== null)
+    .map(({ id, name, color }) => ({ id, name, color }));
+  return { me, partner, people };
 });

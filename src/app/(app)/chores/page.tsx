@@ -1,18 +1,25 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { WashingMachine } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { ComingSoon } from "@/components/coming-soon";
+import { getChores } from "@/lib/chores";
+import { todayIST } from "@/lib/dates";
+import { getHousehold } from "@/lib/household";
+import { ChoreList } from "./chore-list";
 
 export const metadata: Metadata = { title: "Chores" };
 
-export default function Page() {
+async function Chores() {
+  const [{ people }, chores] = await Promise.all([getHousehold(), getChores()]);
+  return <ChoreList chores={chores} people={people} me={people[0]} today={todayIST()} />;
+}
+
+export default function ChoresPage() {
   return (
     <>
-      <PageHeader title="Chores" description="Fixed and rotating household chores." />
-      <ComingSoon icon={WashingMachine} phase={1}>
-        Set up laundry, cooking, waste and more: fixed to one person, rotating weekly, or done
-        together.
-      </ComingSoon>
+      <PageHeader title="Chores" description="Fixed, rotating and together chores." />
+      <Suspense fallback={<div className="bg-muted h-40 animate-pulse rounded-xl" />}>
+        <Chores />
+      </Suspense>
     </>
   );
 }
