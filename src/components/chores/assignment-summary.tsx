@@ -5,7 +5,6 @@ import { personById, type Person } from "./people";
 
 const ROTATION_LABEL: Record<Chore["rotation_unit"], string> = {
   per_week: "Turns every week",
-  per_day: "Turns every day",
   per_occurrence: "Turns every time",
 };
 

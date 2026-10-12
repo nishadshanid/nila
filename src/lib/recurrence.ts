@@ -1,8 +1,10 @@
-import { addDays, daysInMonth, isoWeekday, type DateStr } from "@/lib/dates";
+import { addDays, daysBetween, daysInMonth, isoWeekday, type DateStr } from "@/lib/dates";
 import type { RecurFreq } from "@/lib/types";
 
 export type RecurrenceRule = {
   freq: RecurFreq;
+  /** Daily only: every N days, counted from start_date. 1 = every day, 2 = alternate days. */
+  interval_days: number;
   by_weekday: number[] | null;
   /** 1–31, or -1 for the last day of the month. */
   by_monthday: number | null;
@@ -14,7 +16,7 @@ export function occursOn(rule: RecurrenceRule, date: DateStr): boolean {
   if (date < rule.start_date) return false;
   switch (rule.freq) {
     case "daily":
-      return true;
+      return daysBetween(rule.start_date, date) % Math.max(1, rule.interval_days) === 0;
     case "weekly":
       return rule.by_weekday?.includes(isoWeekday(date)) ?? false;
     case "monthly": {
@@ -60,10 +62,14 @@ function ordinal(n: number) {
 }
 
 /** "Every day", "Every Mon, Thu", "Monthly on the 1st". */
-export function describeRule(rule: Pick<RecurrenceRule, "freq" | "by_weekday" | "by_monthday">) {
+export function describeRule(
+  rule: Pick<RecurrenceRule, "freq" | "interval_days" | "by_weekday" | "by_monthday">,
+) {
   switch (rule.freq) {
     case "daily":
-      return "Every day";
+      if (rule.interval_days <= 1) return "Every day";
+      if (rule.interval_days === 2) return "Every other day";
+      return `Every ${rule.interval_days} days`;
     case "weekly": {
       const days = [...(rule.by_weekday ?? [])].sort((a, b) => a - b);
       if (days.length === 7) return "Every day";
@@ -74,19 +80,4 @@ export function describeRule(rule: Pick<RecurrenceRule, "freq" | "by_weekday" | 
         ? "Monthly on the last day"
         : `Monthly on the ${ordinal(rule.by_monthday ?? 1)}`;
   }
-}
-
-const TIMES = [
-  "",
-  "",
-  "Twice a day",
-  "3 times a day",
-  "4 times a day",
-  "5 times a day",
-  "6 times a day",
-];
-
-/** "" for once a day, otherwise "Twice a day" etc. */
-export function describeTimesPerDay(timesPerDay: number) {
-  return TIMES[timesPerDay] ?? `${timesPerDay} times a day`;
 }

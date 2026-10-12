@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils";
 import { saveChore } from "./actions";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const SLOT_NAMES = ["1st", "2nd", "3rd", "4th"];
 const PREVIEW_DAYS = 28;
 const PREVIEW_ITEMS = 8;
 
@@ -36,8 +35,9 @@ type FormState = {
   by_weekday: number[];
   month_mode: "day" | "last";
   by_monthday: string;
-  times_per_day: number;
-  slot_times: string[];
+  /** "1" = every day, "2" = alternate days; a string so the field can be cleared while typing. */
+  interval_days: string;
+  due_time: string;
   duration_min: string;
   remind_before_min: string;
 };
@@ -64,11 +64,8 @@ function initialState(
       month_mode: chore.by_monthday === -1 ? "last" : "day",
       by_monthday:
         chore.by_monthday && chore.by_monthday > 0 ? String(chore.by_monthday) : todayOfMonth,
-      times_per_day: chore.times_per_day,
-      slot_times: Array.from(
-        { length: chore.times_per_day },
-        (_, i) => chore.slot_times?.[i]?.slice(0, 5) ?? "",
-      ),
+      interval_days: String(chore.interval_days),
+      due_time: chore.due_time?.slice(0, 5) ?? "",
       duration_min: chore.duration_min?.toString() ?? "",
       remind_before_min: chore.remind_before_min?.toString() ?? "",
     };
@@ -86,8 +83,8 @@ function initialState(
     by_weekday: [isoWeekday(today)],
     month_mode: "day",
     by_monthday: todayOfMonth,
-    times_per_day: 1,
-    slot_times: [""],
+    interval_days: "1",
+    due_time: "",
     duration_min: "",
     remind_before_min: "",
   };
@@ -111,8 +108,8 @@ function toInput(s: FormState, people: Person[], me: Person): ChoreInput {
     freq: s.freq,
     by_weekday: s.by_weekday,
     by_monthday: s.month_mode === "last" ? -1 : toInt(s.by_monthday),
-    times_per_day: s.times_per_day,
-    slot_times: s.slot_times,
+    interval_days: toInt(s.interval_days) ?? 0,
+    due_time: s.due_time,
     duration_min: toInt(s.duration_min),
     remind_before_min: toInt(s.remind_before_min),
   };
@@ -184,23 +181,6 @@ export function ChoreForm({
     );
   }
 
-  function setTimesPerDay(n: number) {
-    setState((s) => ({
-      ...s,
-      times_per_day: n,
-      slot_times: Array.from({ length: n }, (_, i) => s.slot_times[i] ?? ""),
-      // "Every day" only makes sense with several times a day.
-      rotation_unit: n === 1 && s.rotation_unit === "per_day" ? "per_occurrence" : s.rotation_unit,
-    }));
-  }
-
-  function setSlotTime(slot: number, value: string) {
-    setState((s) => ({
-      ...s,
-      slot_times: s.slot_times.map((t, i) => (i === slot ? value : t)),
-    }));
-  }
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!parsed.success) {
@@ -218,8 +198,6 @@ export function ChoreForm({
       }
     });
   }
-
-  const multi = state.times_per_day > 1;
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-5">
@@ -275,6 +253,41 @@ export function ChoreForm({
             { value: "monthly", label: "Monthly" },
           ]}
         />
+        {state.freq === "daily" && (
+          <div className="flex flex-col gap-2">
+            <Segmented
+              aria-label="Repeat"
+              value={
+                state.interval_days === "1" ? "1" : state.interval_days === "2" ? "2" : "custom"
+              }
+              onChange={(v) => set("interval_days", v === "custom" ? "3" : v)}
+              options={[
+                { value: "1", label: "Every day" },
+                { value: "2", label: "Alternate days" },
+                { value: "custom", label: "Every N days" },
+              ]}
+            />
+            {state.interval_days !== "1" && state.interval_days !== "2" && (
+              <div className="flex items-center gap-2 text-sm">
+                Every
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  inputMode="numeric"
+                  value={state.interval_days}
+                  onChange={(e) => set("interval_days", e.target.value)}
+                  className="w-20"
+                  aria-label="Number of days"
+                />
+                days
+              </div>
+            )}
+            {state.interval_days !== "1" && (
+              <p className="text-muted-foreground text-xs">Counted from the start date below.</p>
+            )}
+          </div>
+        )}
         {state.freq === "weekly" && (
           <div className="flex gap-1" role="group" aria-label="Days of the week">
             {WEEKDAYS.map((label, i) => {
@@ -333,35 +346,6 @@ export function ChoreForm({
         )}
       </Field>
 
-      <Field label="Times a day">
-        <Segmented
-          aria-label="Times a day"
-          value={String(state.times_per_day)}
-          onChange={(v) => setTimesPerDay(Number(v))}
-          options={[
-            { value: "1", label: "Once" },
-            { value: "2", label: "Twice" },
-            { value: "3", label: "3×" },
-            { value: "4", label: "4×" },
-          ]}
-        />
-        <div className={cn("grid gap-2", multi && "grid-cols-2")}>
-          {state.slot_times.map((time, slot) => (
-            <div key={slot} className="flex flex-col gap-1">
-              <Label htmlFor={`slot-${slot}`} className="text-muted-foreground text-xs font-normal">
-                {multi ? `${SLOT_NAMES[slot]} time (optional)` : "Time (optional)"}
-              </Label>
-              <Input
-                id={`slot-${slot}`}
-                type="time"
-                value={time}
-                onChange={(e) => setSlotTime(slot, e.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-      </Field>
-
       <Field label="Who does it">
         <Segmented
           aria-label="Who does it"
@@ -390,17 +374,12 @@ export function ChoreForm({
                 onChange={(v) => set("rotation_unit", v)}
                 options={[
                   { value: "per_occurrence", label: "Every time" },
-                  ...(multi ? [{ value: "per_day" as const, label: "Every day" }] : []),
                   { value: "per_week", label: "Every week" },
                 ]}
               />
               <p className="text-muted-foreground text-xs">
                 {state.rotation_unit === "per_occurrence" &&
-                  (multi
-                    ? "Each time it happens, the other person does it."
-                    : "Each time it happens, it's the other person's turn.")}
-                {state.rotation_unit === "per_day" &&
-                  "One person does all of it that day, the other the next day."}
+                  "Each time it happens, it's the other person's turn."}
                 {state.rotation_unit === "per_week" &&
                   "One person does it the whole week (Mon–Sun), then you swap."}
               </p>
@@ -410,6 +389,14 @@ export function ChoreForm({
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
+        <Field label="Time (optional)" htmlFor="due_time">
+          <Input
+            id="due_time"
+            type="time"
+            value={state.due_time}
+            onChange={(e) => set("due_time", e.target.value)}
+          />
+        </Field>
         <Field label="Starts on" htmlFor="start_date">
           <Input
             id="start_date"
@@ -465,9 +452,9 @@ export function ChoreForm({
           <ul className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
             {preview.map((o) => {
               const person = personById(people, o.assignee_id);
-              const when = formatTime(o.due_time) ?? (multi ? SLOT_NAMES[o.slot] : null);
+              const when = formatTime(o.due_time);
               return (
-                <li key={`${o.date}-${o.slot}`} className="flex items-center justify-between gap-2">
+                <li key={o.date} className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground">
                     {formatDay(o.date)}
                     {when && ` · ${when}`}

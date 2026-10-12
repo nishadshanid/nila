@@ -10,8 +10,6 @@ import type { OccurrenceWithChore } from "@/lib/chores";
 import { cn } from "@/lib/utils";
 import { personById, type Person } from "./people";
 
-const SLOT_NAMES = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
-
 /**
  * One chore on one day. `readOnly` shows your partner's chores: you see whether
  * they're done, but only they can tick them off.
@@ -32,9 +30,7 @@ export function ChoreCard({
   const priority = priorityMeta(chore.priority);
   const completedBy = personById(people, occurrence.completed_by);
   const time = formatTime(occurrence.due_time);
-  const slotName =
-    chore.times_per_day > 1 ? `${SLOT_NAMES[occurrence.slot]} of ${chore.times_per_day}` : null;
-  const details = [time, slotName].filter(Boolean).join(" · ");
+  const details = time;
 
   function toggle(checked: boolean) {
     startTransition(async () => {

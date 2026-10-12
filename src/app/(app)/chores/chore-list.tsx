@@ -18,7 +18,7 @@ import { personById, type Person } from "@/components/chores/people";
 import { PersonDot } from "@/components/person-dot";
 import { categoryMeta, formatTime, priorityMeta } from "@/lib/chore-meta";
 import { addDays, formatDay, type DateStr } from "@/lib/dates";
-import { describeRule, describeTimesPerDay } from "@/lib/recurrence";
+import { describeRule } from "@/lib/recurrence";
 import { planOccurrences } from "@/lib/rotation";
 import type { Chore } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -27,12 +27,10 @@ import { deleteChore, setChoreActive, type ActionResult } from "./actions";
 
 type Editing = { chore?: Chore } | null;
 
-/** "Every Mon · Twice a day · 9:00 AM, 8:00 PM" */
+/** "Every Mon at 9:00 AM" */
 function scheduleSummary(chore: Chore) {
-  const times = (chore.slot_times ?? []).map(formatTime).filter(Boolean);
-  return [describeRule(chore), describeTimesPerDay(chore.times_per_day), times.join(", ")]
-    .filter(Boolean)
-    .join(" · ");
+  const time = formatTime(chore.due_time);
+  return time ? `${describeRule(chore)} at ${time}` : describeRule(chore);
 }
 
 function NextUp({ chore, people, today }: { chore: Chore; people: Person[]; today: DateStr }) {

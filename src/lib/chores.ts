@@ -36,7 +36,6 @@ export async function getChoresForDay(date: DateStr): Promise<OccurrenceWithChor
   return (data as OccurrenceWithChore[]).sort(
     (a, b) =>
       (a.due_time ?? "99").localeCompare(b.due_time ?? "99") ||
-      a.chore.title.localeCompare(b.chore.title) ||
-      a.slot - b.slot,
+      a.chore.title.localeCompare(b.chore.title),
   );
 }

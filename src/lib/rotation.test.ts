@@ -13,8 +13,8 @@ const laundry: ScheduledChore = {
   by_weekday: [1],
   by_monthday: null,
   start_date: "2026-10-12", // Monday
-  times_per_day: 1,
-  slot_times: null,
+  interval_days: 1,
+  due_time: null,
 };
 
 describe("rotation", () => {
@@ -78,38 +78,20 @@ describe("rotation", () => {
     expect(assigneeFor({ ...laundry, assignment_type: "together" }, "2026-10-19")).toBeNull();
   });
 
-  it("twice a day, every time: morning and evening alternate", () => {
+  it("alternate days, taking turns every time", () => {
     const calls: ScheduledChore = {
       ...laundry,
       freq: "daily",
+      interval_days: 2,
       rotation_unit: "per_occurrence",
-      times_per_day: 2,
-      slot_times: ["09:00", "20:00"],
     };
-    const plan = planOccurrences(calls, "2026-10-12", "2026-10-13");
-    expect(plan.map((o) => [o.date, o.slot, o.due_time, o.assignee_id])).toEqual([
-      ["2026-10-12", 0, "09:00", A],
-      ["2026-10-12", 1, "20:00", B],
-      ["2026-10-13", 0, "09:00", A],
-      ["2026-10-13", 1, "20:00", B],
-    ]);
-  });
-
-  it("twice a day, every day: one person does both, then swap", () => {
-    const calls: ScheduledChore = {
-      ...laundry,
-      freq: "daily",
-      rotation_unit: "per_day",
-      times_per_day: 2,
-      slot_times: null,
-    };
-    expect(planOccurrences(calls, "2026-10-12", "2026-10-14").map((o) => o.assignee_id)).toEqual([
-      A,
-      A,
-      B,
-      B,
-      A,
-      A,
+    expect(
+      planOccurrences(calls, "2026-10-12", "2026-10-19").map((o) => [o.date, o.assignee_id]),
+    ).toEqual([
+      ["2026-10-12", A],
+      ["2026-10-14", B],
+      ["2026-10-16", A],
+      ["2026-10-18", B],
     ]);
   });
 });
