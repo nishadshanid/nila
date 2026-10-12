@@ -17,6 +17,7 @@ import { getLeavesOn } from "@/lib/leaves";
 import { getRemindersForDay, type DayReminder } from "@/lib/reminders";
 import { getTasksForDay } from "@/lib/tasks";
 import { TaskRow } from "@/components/tasks/task-row";
+import { DayTodos } from "@/components/tasks/day-todos";
 import { DayReminderRow } from "@/components/reminders/day-reminder";
 import type { Leave, Person, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -350,12 +351,7 @@ async function Today({
   );
 
   const visible = view === "couple" ? shared : [...mine, ...together, ...handedOver];
-  const nothing =
-    visible.length === 0 &&
-    visibleFlexible.length === 0 &&
-    todos.length === 0 &&
-    plans.length === 0 &&
-    dayReminders.length === 0;
+  const noChores = visible.length === 0 && visibleFlexible.length === 0;
 
   return (
     <>
@@ -377,17 +373,36 @@ async function Today({
       <ReminderSection items={dayReminders} />
       <TaskSection title="Plans" tasks={plans} people={people} meId={me.id} today={today} />
 
-      {nothing ? (
-        <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
-          {view === "mine" ? "Nothing for you on this day." : "Nothing shared on this day."}{" "}
-          <Link href="/tasks" className="underline">
-            Add a todo
-          </Link>{" "}
-          or{" "}
+      {view === "mine" ? (
+        <DayTodos
+          key={`mine-${date}`}
+          title="Todos"
+          tasks={todos}
+          people={people}
+          me={me}
+          date={date}
+          today={today}
+        />
+      ) : (
+        <DayTodos
+          key={`couple-${date}`}
+          title="Couple todos"
+          tasks={todos}
+          people={people}
+          me={me}
+          date={date}
+          today={today}
+          coupleOnly
+        />
+      )}
+
+      {noChores ? (
+        <p className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
+          {view === "mine" ? "No chores for you on this day." : "No shared chores on this day."}{" "}
           <Link href="/chores" className="underline">
-            set up chores
+            Set up chores
           </Link>
-        </div>
+        </p>
       ) : view === "mine" ? (
         <>
           <ChoreSection
@@ -405,7 +420,6 @@ async function Today({
             meId={me.id}
             handedOver
           />
-          <TaskSection title="Todos" tasks={todos} people={people} meId={me.id} today={today} />
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       ) : (
@@ -423,13 +437,6 @@ async function Today({
             people={people}
             meId={me.id}
             showTurn
-          />
-          <TaskSection
-            title="Couple todos"
-            tasks={todos}
-            people={people}
-            meId={me.id}
-            today={today}
           />
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>

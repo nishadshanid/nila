@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PersonDot } from "@/components/person-dot";
 import { personById, type Person } from "@/components/chores/people";
-import { deleteTask, setTaskDone } from "@/app/(app)/tasks/actions";
+import { deleteTask, setTaskDone } from "@/app/(app)/plans/actions";
 import { formatTime, priorityMeta } from "@/lib/chore-meta";
 import { relativeDay, type DateStr } from "@/lib/dates";
 import type { Task } from "@/lib/types";

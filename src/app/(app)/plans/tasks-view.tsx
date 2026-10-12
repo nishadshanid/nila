@@ -17,7 +17,7 @@ import type { Priority, Task } from "@/lib/types";
 import { saveTask } from "./actions";
 import { TaskForm, type TaskDefaults } from "./task-form";
 
-type Tab = "mine" | "couple" | "plans";
+export type Tab = "mine" | "couple" | "plans";
 type When = "all" | "today" | "week" | "overdue" | "someday";
 
 const PRIORITY_RANK: Record<Priority, number> = { high: 0, med: 1, low: 2 };
@@ -58,14 +58,16 @@ export function TasksView({
   people,
   me,
   today,
+  initialTab = "plans",
 }: {
   tasks: Task[];
   people: Person[];
   me: Person;
   today: DateStr;
+  initialTab?: Tab;
 }) {
   const hasPartner = people.length > 1;
-  const [tab, setTab] = useState<Tab>("mine");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [when, setWhen] = useState<When>("all");
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [showDone, setShowDone] = useState(false);
@@ -127,9 +129,9 @@ export function TasksView({
         onChange={(v) => setTab(v)}
         className="mb-4"
         options={[
+          { value: "plans", label: "Plans" },
           { value: "mine", label: "My todos" },
           ...(hasPartner ? [{ value: "couple" as const, label: "Couple todos" }] : []),
-          { value: "plans", label: "Plans" },
         ]}
       />
 

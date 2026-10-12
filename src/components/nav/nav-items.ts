@@ -2,7 +2,7 @@ import {
   CalendarDays,
   CalendarOff,
   House,
-  ListTodo,
+  CalendarHeart,
   Bell,
   Settings,
   ShoppingCart,
@@ -17,7 +17,7 @@ export type NavItem = { href: string; label: string; icon: LucideIcon };
 export const PRIMARY_NAV: NavItem[] = [
   { href: "/", label: "Today", icon: House },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/plans", label: "Plans", icon: CalendarHeart },
   { href: "/shopping", label: "Shopping", icon: ShoppingCart },
 ];
 
