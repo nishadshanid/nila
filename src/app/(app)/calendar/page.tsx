@@ -1,17 +1,37 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { CalendarDays } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { ComingSoon } from "@/components/coming-soon";
+import { getCalendarMonth } from "@/lib/calendar";
+import { monthKeyIST } from "@/lib/dates";
+import { CalendarView } from "./calendar-view";
 
 export const metadata: Metadata = { title: "Calendar" };
 
-export default function Page() {
+async function Calendar({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+  const params = await searchParams;
+  const month =
+    params.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : monthKeyIST();
+  const { days, today, items, people, meId } = await getCalendarMonth(month);
+  return (
+    <CalendarView
+      key={month}
+      month={month}
+      days={days}
+      today={today}
+      items={items}
+      people={people}
+      meId={meId}
+    />
+  );
+}
+
+export default function CalendarPage({ searchParams }: PageProps<"/calendar">) {
   return (
     <>
-      <PageHeader title="Calendar" description="Everything planned, day by day." />
-      <ComingSoon icon={CalendarDays} phase={6}>
-        One calendar with chores, tasks, plans, reminders and leaves for both of you.
-      </ComingSoon>
+      <PageHeader title="Calendar" description="Chores, todos, plans, reminders and leave." />
+      <Suspense fallback={<div className="bg-muted h-96 animate-pulse rounded-xl" />}>
+        <Calendar searchParams={searchParams} />
+      </Suspense>
     </>
   );
 }
