@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { choreInputSchema, type ChoreInput } from "@/lib/chore-schema";
 import { regenerateFuture } from "@/lib/occurrences";
+import { todayIST } from "@/lib/dates";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -91,6 +92,53 @@ export async function setOccurrenceDone(id: string, done: boolean): Promise<Acti
         : { status: "pending", completed_by: null, completed_at: null },
     )
     .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+/** Logs (or un-logs) a flexible chore like "gym 4 times a week" on one day. */
+export async function logFlexibleChore(
+  choreId: string,
+  date: string,
+  done: boolean,
+): Promise<ActionResult> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Invalid date" };
+  if (date > todayIST())
+    return { ok: false, error: "You can't log a day that hasn't happened yet." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You're signed out." };
+
+  const { data: chore, error: choreError } = await supabase
+    .from("chores")
+    .select("assignment_type, fixed_assignee, flex_target")
+    .eq("id", choreId)
+    .single();
+  if (choreError) return { ok: false, error: choreError.message };
+  if (chore.flex_target == null) return { ok: false, error: "This chore has set days." };
+  if (chore.assignment_type === "fixed" && chore.fixed_assignee !== user.id) {
+    return { ok: false, error: "Only the person doing this chore can log it." };
+  }
+
+  const assignee = chore.assignment_type === "fixed" ? user.id : null;
+  const { error } = done
+    ? await supabase.from("chore_occurrences").upsert(
+        {
+          chore_id: choreId,
+          date,
+          assignee_id: assignee,
+          original_assignee_id: assignee,
+          status: "done",
+          completed_by: user.id,
+          completed_at: new Date().toISOString(),
+        },
+        { onConflict: "chore_id,date" },
+      )
+    : await supabase.from("chore_occurrences").delete().eq("chore_id", choreId).eq("date", date);
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true };

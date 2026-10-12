@@ -66,4 +66,19 @@ describe("choreInputSchema", () => {
       false,
     );
   });
+
+  it("flexible weekly chores need no days and can't take turns", () => {
+    const gym = { ...base, assignment_type: "fixed" as const, flex_target: 4, by_weekday: [] };
+    const parsed = choreInputSchema.parse(gym);
+    expect(parsed.flex_target).toBe(4);
+    expect(parsed.by_weekday).toBeNull();
+    expect(choreInputSchema.safeParse({ ...gym, assignment_type: "rotating" }).success).toBe(false);
+    expect(choreInputSchema.safeParse({ ...gym, flex_target: 8 }).success).toBe(false);
+  });
+
+  it("daily chores are never flexible", () => {
+    expect(
+      choreInputSchema.parse({ ...base, freq: "daily", flex_target: 3 }).flex_target,
+    ).toBeNull();
+  });
 });

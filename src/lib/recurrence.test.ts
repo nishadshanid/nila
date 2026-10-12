@@ -3,6 +3,7 @@ import {
   countBefore,
   datesInRange,
   describeRule,
+  flexPeriod,
   occursOn,
   type RecurrenceRule,
 } from "./recurrence";
@@ -103,5 +104,19 @@ describe("recurrence", () => {
     expect(datesInRange(rule, "2026-10-13", "2026-10-15")).toEqual(["2026-10-14"]);
     expect(describeRule(rule)).toBe("Every other day");
     expect(describeRule({ ...rule, interval_days: 3 })).toBe("Every 3 days");
+  });
+
+  it("flexible chores are never scheduled on dates", () => {
+    const gym: RecurrenceRule = { ...weekly([]), flex_target: 4 };
+    expect(datesInRange(gym, "2026-10-12", "2026-10-25")).toEqual([]);
+    expect(describeRule(gym)).toBe("4 times a week");
+    expect(describeRule({ ...gym, freq: "monthly", flex_target: 2 })).toBe("Twice a month");
+    expect(describeRule({ ...gym, flex_target: 1 })).toBe("Once a week");
+  });
+
+  it("flexible periods are Mon–Sun weeks and calendar months", () => {
+    expect(flexPeriod("weekly", "2026-10-18")).toEqual({ from: "2026-10-12", to: "2026-10-18" });
+    expect(flexPeriod("weekly", "2026-12-30")).toEqual({ from: "2026-12-28", to: "2027-01-03" });
+    expect(flexPeriod("monthly", "2026-02-10")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
   });
 });

@@ -35,6 +35,8 @@ export type Chore = {
   by_weekday: number[] | null;
   /** 1–31, or -1 for the last day of the month. */
   by_monthday: number | null;
+  /** Flexible chores: N times per week/month on any days. Null for scheduled chores. */
+  flex_target: number | null;
   /** Daily chores repeat every N days: 1 = every day, 2 = alternate days. */
   interval_days: number;
   due_time: string | null;

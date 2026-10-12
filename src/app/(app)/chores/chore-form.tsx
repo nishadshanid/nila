@@ -14,6 +14,7 @@ import { CHORE_CATEGORIES, PRIORITIES, formatTime } from "@/lib/chore-meta";
 import { choreInputSchema, type ChoreInput } from "@/lib/chore-schema";
 import { addDays, formatDay, isoWeekday, type DateStr } from "@/lib/dates";
 import { planOccurrences } from "@/lib/rotation";
+import { describeRule } from "@/lib/recurrence";
 import type { AssignmentType, Chore, RecurFreq, RotationUnit } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { saveChore } from "./actions";
@@ -34,6 +35,9 @@ type FormState = {
   freq: RecurFreq;
   by_weekday: number[];
   month_mode: "day" | "last";
+  /** Weekly/monthly on any days: N times per period instead of set days. */
+  flexible: boolean;
+  flex_target: string;
   by_monthday: string;
   /** "1" = every day, "2" = alternate days; a string so the field can be cleared while typing. */
   interval_days: string;
@@ -62,6 +66,8 @@ function initialState(
       freq: chore.freq,
       by_weekday: chore.by_weekday ?? [isoWeekday(today)],
       month_mode: chore.by_monthday === -1 ? "last" : "day",
+      flexible: chore.flex_target != null,
+      flex_target: String(chore.flex_target ?? 3),
       by_monthday:
         chore.by_monthday && chore.by_monthday > 0 ? String(chore.by_monthday) : todayOfMonth,
       interval_days: String(chore.interval_days),
@@ -82,6 +88,8 @@ function initialState(
     freq: "weekly",
     by_weekday: [isoWeekday(today)],
     month_mode: "day",
+    flexible: false,
+    flex_target: "3",
     by_monthday: todayOfMonth,
     interval_days: "1",
     due_time: "",
@@ -109,6 +117,7 @@ function toInput(s: FormState, people: Person[], me: Person): ChoreInput {
     by_weekday: s.by_weekday,
     by_monthday: s.month_mode === "last" ? -1 : toInt(s.by_monthday),
     interval_days: toInt(s.interval_days) ?? 0,
+    flex_target: s.flexible && s.freq !== "daily" ? (toInt(s.flex_target) ?? 0) : null,
     due_time: s.due_time,
     duration_min: toInt(s.duration_min),
     remind_before_min: toInt(s.remind_before_min),
@@ -171,6 +180,15 @@ export function ChoreForm({
       PREVIEW_ITEMS,
     );
   }, [parsed, today]);
+
+  function setFlexible(flexible: boolean) {
+    setState((s) => ({
+      ...s,
+      flexible,
+      // Taking turns needs set days; any-day chores are yours or together.
+      assignment_type: flexible && s.assignment_type === "rotating" ? "fixed" : s.assignment_type,
+    }));
+  }
 
   function toggleWeekday(day: number) {
     set(
@@ -289,6 +307,37 @@ export function ChoreForm({
           </div>
         )}
         {state.freq === "weekly" && (
+          <Segmented
+            aria-label="Which days"
+            value={state.flexible ? "any" : "set"}
+            onChange={(v) => setFlexible(v === "any")}
+            options={[
+              { value: "set", label: "On set days" },
+              { value: "any", label: "Any days" },
+            ]}
+          />
+        )}
+        {state.freq !== "daily" && state.flexible && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-sm">
+              <Input
+                type="number"
+                min={1}
+                max={state.freq === "weekly" ? 7 : 31}
+                inputMode="numeric"
+                value={state.flex_target}
+                onChange={(e) => set("flex_target", e.target.value)}
+                className="w-20"
+                aria-label="Times per period"
+              />
+              times a {state.freq === "weekly" ? "week (Mon–Sun)" : "month"}, on any days
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Tick it on the Today page on the days you do it.
+            </p>
+          </div>
+        )}
+        {state.freq === "weekly" && !state.flexible && (
           <div className="flex gap-1" role="group" aria-label="Days of the week">
             {WEEKDAYS.map((label, i) => {
               const day = i + 1;
@@ -316,14 +365,18 @@ export function ChoreForm({
           <div className="flex flex-col gap-2">
             <Segmented
               aria-label="Day of the month"
-              value={state.month_mode}
-              onChange={(v) => set("month_mode", v)}
+              value={state.flexible ? "any" : state.month_mode}
+              onChange={(v) => {
+                setFlexible(v === "any");
+                if (v !== "any") set("month_mode", v);
+              }}
               options={[
                 { value: "day", label: "On a date" },
-                { value: "last", label: "Last day of month" },
+                { value: "last", label: "Last day" },
+                { value: "any", label: "Any days" },
               ]}
             />
-            {state.month_mode === "day" ? (
+            {state.flexible ? null : state.month_mode === "day" ? (
               <div className="flex items-center gap-2 text-sm">
                 On day
                 <Input
@@ -352,7 +405,9 @@ export function ChoreForm({
           value={state.assignment_type}
           onChange={(v) => set("assignment_type", v)}
           options={[
-            ...(hasPartner ? [{ value: "rotating" as const, label: "Take turns" }] : []),
+            ...(hasPartner && !(state.flexible && state.freq !== "daily")
+              ? [{ value: "rotating" as const, label: "Take turns" }]
+              : []),
             { value: "fixed", label: "Just me" },
             ...(hasPartner ? [{ value: "together" as const, label: "Together" }] : []),
           ]}
@@ -442,7 +497,11 @@ export function ChoreForm({
 
       <div className="bg-muted/50 rounded-lg p-3">
         <p className="mb-2 text-sm font-medium">Coming up</p>
-        {preview.length === 0 ? (
+        {parsed.success && parsed.data.flex_target != null ? (
+          <p className="text-muted-foreground text-sm">
+            {describeRule(parsed.data)}, on whichever days suit you. Progress shows on Today.
+          </p>
+        ) : preview.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             {parsed.success
               ? "Nothing scheduled in the next 4 weeks."

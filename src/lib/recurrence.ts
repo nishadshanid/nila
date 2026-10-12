@@ -1,4 +1,11 @@
-import { addDays, daysBetween, daysInMonth, isoWeekday, type DateStr } from "@/lib/dates";
+import {
+  addDays,
+  daysBetween,
+  daysInMonth,
+  isoWeekday,
+  startOfWeek,
+  type DateStr,
+} from "@/lib/dates";
 import type { RecurFreq } from "@/lib/types";
 
 export type RecurrenceRule = {
@@ -8,12 +15,31 @@ export type RecurrenceRule = {
   by_weekday: number[] | null;
   /** 1–31, or -1 for the last day of the month. */
   by_monthday: number | null;
+  /**
+   * Flexible chores: N times per week (freq "weekly") or per month (freq "monthly"),
+   * on any days. They're never scheduled on specific dates.
+   */
+  flex_target?: number | null;
   start_date: DateStr;
 };
 
+export function isFlexible(rule: Pick<RecurrenceRule, "flex_target">) {
+  return rule.flex_target != null;
+}
+
+/** The week (Mon–Sun) or calendar month that `date` falls in, for flexible chores. */
+export function flexPeriod(freq: RecurFreq, date: DateStr): { from: DateStr; to: DateStr } {
+  if (freq === "monthly") {
+    const from = `${date.slice(0, 8)}01`;
+    return { from, to: `${date.slice(0, 8)}${String(daysInMonth(date)).padStart(2, "0")}` };
+  }
+  const from = startOfWeek(date);
+  return { from, to: addDays(from, 6) };
+}
+
 /** Whether the rule schedules something on `date`. Nothing happens before start_date. */
 export function occursOn(rule: RecurrenceRule, date: DateStr): boolean {
-  if (date < rule.start_date) return false;
+  if (date < rule.start_date || isFlexible(rule)) return false;
   switch (rule.freq) {
     case "daily":
       return daysBetween(rule.start_date, date) % Math.max(1, rule.interval_days) === 0;
@@ -61,10 +87,20 @@ function ordinal(n: number) {
   return `${n}${suffix}`;
 }
 
-/** "Every day", "Every Mon, Thu", "Monthly on the 1st". */
+function timesLabel(n: number) {
+  return n === 1 ? "Once" : n === 2 ? "Twice" : `${n} times`;
+}
+
+/** "Every day", "Every Mon, Thu", "Monthly on the 1st", "4 times a week". */
 export function describeRule(
-  rule: Pick<RecurrenceRule, "freq" | "interval_days" | "by_weekday" | "by_monthday">,
+  rule: Pick<
+    RecurrenceRule,
+    "freq" | "interval_days" | "by_weekday" | "by_monthday" | "flex_target"
+  >,
 ) {
+  if (rule.flex_target != null) {
+    return `${timesLabel(rule.flex_target)} a ${rule.freq === "monthly" ? "month" : "week"}`;
+  }
   switch (rule.freq) {
     case "daily":
       if (rule.interval_days <= 1) return "Every day";

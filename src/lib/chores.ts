@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { ensureOccurrences } from "@/lib/occurrences";
 import type { DateStr } from "@/lib/dates";
+import { flexPeriod } from "@/lib/recurrence";
 import type { Chore, ChoreOccurrence } from "@/lib/types";
 
 export type OccurrenceWithChore = ChoreOccurrence & { chore: Chore };
@@ -30,7 +31,9 @@ export async function getChoresForDay(date: DateStr): Promise<OccurrenceWithChor
   const { data, error } = await supabase
     .from("chore_occurrences")
     .select("*, chore:chores!inner(*)")
-    .eq("date", date);
+    .eq("date", date)
+    // Flexible chores are shown with their weekly/monthly progress instead.
+    .is("chore.flex_target", null);
   if (error) throw new Error(`Could not load today's chores: ${error.message}`);
 
   return (data as OccurrenceWithChore[]).sort(
@@ -38,4 +41,51 @@ export async function getChoresForDay(date: DateStr): Promise<OccurrenceWithChor
       (a.due_time ?? "99").localeCompare(b.due_time ?? "99") ||
       a.chore.title.localeCompare(b.chore.title),
   );
+}
+
+export type FlexibleProgress = {
+  chore: Chore;
+  period: { from: DateStr; to: DateStr };
+  /** Days logged this period, oldest first. */
+  doneDates: DateStr[];
+  /** Whether it was logged on the day being viewed. */
+  doneOnDate: boolean;
+};
+
+/** Flexible chores ("4 times a week") with their progress in the period containing `date`. */
+export async function getFlexibleForDay(date: DateStr): Promise<FlexibleProgress[]> {
+  const supabase = await createClient();
+  const { data: chores, error } = await supabase
+    .from("chores")
+    .select("*")
+    .eq("active", true)
+    .not("flex_target", "is", null)
+    .lte("start_date", date)
+    .order("title");
+  if (error) throw new Error(`Could not load flexible chores: ${error.message}`);
+  if (chores.length === 0) return [];
+
+  // One query covering both the week and the month around `date`.
+  const week = flexPeriod("weekly", date);
+  const month = flexPeriod("monthly", date);
+  const { data: logged, error: logError } = await supabase
+    .from("chore_occurrences")
+    .select("chore_id, date")
+    .in(
+      "chore_id",
+      chores.map((c) => c.id),
+    )
+    .eq("status", "done")
+    .gte("date", week.from < month.from ? week.from : month.from)
+    .lte("date", week.to > month.to ? week.to : month.to)
+    .order("date");
+  if (logError) throw new Error(`Could not load flexible progress: ${logError.message}`);
+
+  return (chores as Chore[]).map((chore) => {
+    const period = flexPeriod(chore.freq, date);
+    const doneDates = logged
+      .filter((o) => o.chore_id === chore.id && o.date >= period.from && o.date <= period.to)
+      .map((o) => o.date as DateStr);
+    return { chore, period, doneDates, doneOnDate: doneDates.includes(date) };
+  });
 }

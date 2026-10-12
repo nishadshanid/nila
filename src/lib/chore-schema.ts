@@ -31,6 +31,8 @@ export const choreInputSchema = z
     rotation_unit: z.enum(["per_week", "per_occurrence"]),
     start_date: z.iso.date("Pick a start date"),
     freq: z.enum(["daily", "weekly", "monthly"]),
+    // Weekly/monthly: N times per period on any days, instead of set days.
+    flex_target: z.number().int().min(1, "At least once").max(31).nullable().optional(),
     // Daily only: 1 = every day, 2 = alternate days, …
     interval_days: z.number().int().min(1, "Repeat at least every day").max(365),
     by_weekday: z.array(z.number().int().min(1).max(7)).nullable().optional(),
@@ -61,22 +63,40 @@ export const choreInputSchema = z
         message: "Rotation needs both of you",
       });
     }
-    if (c.freq === "weekly" && !c.by_weekday?.length) {
+    const flexible = c.freq !== "daily" && c.flex_target != null;
+    if (flexible && c.assignment_type === "rotating") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["assignment_type"],
+        message: "Any-day chores can be just yours or together",
+      });
+    }
+    if (flexible && c.freq === "weekly" && c.flex_target! > 7) {
+      ctx.addIssue({ code: "custom", path: ["flex_target"], message: "At most 7 times a week" });
+    }
+    if (!flexible && c.freq === "weekly" && !c.by_weekday?.length) {
       ctx.addIssue({ code: "custom", path: ["by_weekday"], message: "Pick at least one day" });
     }
-    if (c.freq === "monthly" && !c.by_monthday) {
+    if (!flexible && c.freq === "monthly" && !c.by_monthday) {
       ctx.addIssue({ code: "custom", path: ["by_monthday"], message: "Pick a day of the month" });
     }
   })
   // Drop fields that don't apply, so the database stays consistent.
-  .transform((c) => ({
-    ...c,
-    fixed_assignee: c.assignment_type === "fixed" ? (c.fixed_assignee ?? null) : null,
-    rotation_order: c.assignment_type === "rotating" ? (c.rotation_order ?? null) : null,
-    by_weekday: c.freq === "weekly" ? [...new Set(c.by_weekday ?? [])].sort((a, b) => a - b) : null,
-    by_monthday: c.freq === "monthly" ? c.by_monthday : null,
-    interval_days: c.freq === "daily" ? c.interval_days : 1,
-  }));
+  .transform((c) => {
+    const flexible = c.freq !== "daily" && c.flex_target != null;
+    return {
+      ...c,
+      flex_target: flexible ? c.flex_target! : null,
+      fixed_assignee: c.assignment_type === "fixed" ? (c.fixed_assignee ?? null) : null,
+      rotation_order: c.assignment_type === "rotating" ? (c.rotation_order ?? null) : null,
+      by_weekday:
+        c.freq === "weekly" && !flexible
+          ? [...new Set(c.by_weekday ?? [])].sort((a, b) => a - b)
+          : null,
+      by_monthday: c.freq === "monthly" && !flexible ? c.by_monthday : null,
+      interval_days: c.freq === "daily" ? c.interval_days : 1,
+    };
+  });
 
 export type ChoreInput = z.input<typeof choreInputSchema>;
 export type ChoreValues = z.output<typeof choreInputSchema>;

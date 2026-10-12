@@ -2,10 +2,16 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getHousehold } from "@/lib/household";
-import { getChoresForDay, type OccurrenceWithChore } from "@/lib/chores";
+import {
+  getChoresForDay,
+  getFlexibleForDay,
+  type FlexibleProgress,
+  type OccurrenceWithChore,
+} from "@/lib/chores";
 import { addDays, formatDay, todayIST, TZ, type DateStr } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { ChoreCard } from "@/components/chores/chore-card";
+import { FlexibleCard } from "@/components/chores/flexible-card";
 import { PersonDot } from "@/components/person-dot";
 import type { Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -147,6 +153,39 @@ function ChoreSection({
   );
 }
 
+function FlexibleSection({
+  items,
+  date,
+  today,
+  meId,
+}: {
+  items: FlexibleProgress[];
+  date: DateStr;
+  today: DateStr;
+  meId: string;
+}) {
+  if (items.length === 0) return null;
+  const label =
+    date === today ? "today" : date === addDays(today, -1) ? "yesterday" : formatDay(date, "EEE");
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-sm font-semibold">This week &amp; month</h2>
+      <ul className="flex flex-col gap-2">
+        {items.map((item) => (
+          <FlexibleCard
+            key={item.chore.id}
+            progress={item}
+            date={date}
+            dayLabel={label}
+            canLog={date <= today}
+            readOnly={item.chore.assignment_type === "fixed" && item.chore.fixed_assignee !== meId}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 async function Today({
   searchParams,
 }: {
@@ -157,7 +196,14 @@ async function Today({
   const today = todayIST(now);
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today;
   const view: View = params.view === "couple" && partner ? "couple" : "mine";
-  const occurrences = await getChoresForDay(date);
+  const [occurrences, flexible] = await Promise.all([
+    getChoresForDay(date),
+    getFlexibleForDay(date),
+  ]);
+  const myFlexible = flexible.filter(
+    (f) => f.chore.assignment_type !== "fixed" || f.chore.fixed_assignee === me.id,
+  );
+  const visibleFlexible = view === "couple" ? flexible : myFlexible;
 
   const mine = occurrences.filter((o) => o.assignee_id === me.id);
   const together = occurrences.filter((o) => o.assignee_id === null);
@@ -180,7 +226,7 @@ async function Today({
       {partner && <ViewSwitch date={date} today={today} view={view} />}
       <DayNav date={date} today={today} view={view} />
 
-      {visible.length === 0 ? (
+      {visible.length === 0 && visibleFlexible.length === 0 ? (
         <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
           {view === "mine" ? "Nothing for you on this day." : "No chores on this day."}{" "}
           <Link href="/chores" className="underline">
@@ -191,10 +237,11 @@ async function Today({
         <>
           <ChoreSection title="Your chores" person={me} occurrences={mine} people={people} />
           <ChoreSection title="Together" occurrences={together} people={people} />
+          <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       ) : (
         <>
-          <Progress occurrences={occurrences} />
+          {occurrences.length > 0 && <Progress occurrences={occurrences} />}
           <ChoreSection title="You" person={me} occurrences={mine} people={people} />
           <ChoreSection title="Together" occurrences={together} people={people} />
           {partner && (
@@ -206,6 +253,7 @@ async function Today({
               readOnly
             />
           )}
+          <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       )}
     </>
