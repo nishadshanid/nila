@@ -9,6 +9,8 @@ export const taskInputSchema = z
     title: z.string().trim().min(1, "Give it a title").max(120),
     notes: z.string().trim().max(2000).nullable().optional().transform(emptyToNull),
     priority: z.enum(["low", "med", "high"]),
+    // Own points (couple todos only); null = the priority's points.
+    points: z.number().int().min(0).max(100).nullable().optional(),
     visibility: z.enum(["personal", "couple"]),
     assignee_id: z.uuid().nullable().optional(),
     date: z
@@ -49,6 +51,7 @@ export const taskInputSchema = z
     assignee_id: t.visibility === "couple" ? (t.assignee_id ?? null) : null,
     end_date: t.kind === "plan" && t.end_date && t.end_date !== t.date ? t.end_date : null,
     remind_before_min: t.date ? (t.remind_before_min ?? null) : null,
+    points: t.kind === "todo" && t.visibility === "couple" ? (t.points ?? null) : null,
   }));
 
 export type TaskInput = z.input<typeof taskInputSchema>;

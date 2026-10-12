@@ -5,9 +5,12 @@ import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { logFlexibleChore } from "@/app/(app)/chores/actions";
+import { PointsPill } from "@/components/points/points-pill";
+import { usePointRules } from "@/components/points/rules-context";
 import { categoryMeta, priorityMeta } from "@/lib/chore-meta";
 import type { FlexibleProgress } from "@/lib/chores";
 import { formatDay, type DateStr } from "@/lib/dates";
+import { pointsFor } from "@/lib/points";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,6 +40,7 @@ export function FlexibleCard({
   const reached = count >= target;
   const Icon = categoryMeta(chore.category).icon;
   const priority = priorityMeta(chore.priority);
+  const points = pointsFor(chore, usePointRules());
   const periodName = chore.freq === "monthly" ? "this month" : "this week";
   const periodRange =
     chore.freq === "monthly"
@@ -48,6 +52,7 @@ export function FlexibleCard({
       setDoneOnDate(!doneOnDate);
       const result = await logFlexibleChore(chore.id, date, !doneOnDate);
       if (!result.ok) toast.error(result.error);
+      else if (!doneOnDate && points > 0) toast.success(`+${points} points 🎉`);
     });
   }
 
@@ -61,6 +66,7 @@ export function FlexibleCard({
             {count} of {target} {periodName} ({periodRange}){reached && " · goal reached 🎉"}
           </p>
         </div>
+        <PointsPill points={points} />
         <span
           className={cn("size-2 shrink-0 rounded-full", priority.dot)}
           title={`${priority.label} priority`}

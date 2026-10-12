@@ -17,6 +17,7 @@ import { planOccurrences } from "@/lib/rotation";
 import { describeRule } from "@/lib/recurrence";
 import type { AssignmentType, Chore, RecurFreq, RotationUnit } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { usePointRules } from "@/components/points/rules-context";
 import { saveChore } from "./actions";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -28,6 +29,8 @@ type FormState = {
   category: string;
   notes: string;
   priority: ChoreInput["priority"];
+  /** Empty = the priority's points. */
+  points: string;
   assignment_type: AssignmentType;
   first_turn: string;
   rotation_unit: RotationUnit;
@@ -59,6 +62,7 @@ function initialState(
       category: chore.category,
       notes: chore.notes ?? "",
       priority: chore.priority,
+      points: chore.points?.toString() ?? "",
       assignment_type: chore.assignment_type,
       first_turn: chore.rotation_order?.[0] ?? me.id,
       rotation_unit: chore.rotation_unit,
@@ -81,6 +85,7 @@ function initialState(
     category: "laundry",
     notes: "",
     priority: "med",
+    points: "",
     assignment_type: hasPartner ? "rotating" : "fixed",
     first_turn: me.id,
     rotation_unit: "per_week",
@@ -107,6 +112,7 @@ function toInput(s: FormState, people: Person[], me: Person): ChoreInput {
     category: s.category,
     notes: s.notes,
     priority: s.priority,
+    points: toInt(s.points),
     assignment_type: s.assignment_type,
     // "Just me": the server also enforces this.
     fixed_assignee: me.id,
@@ -162,6 +168,7 @@ export function ChoreForm({
   today: DateStr;
   onDone: () => void;
 }) {
+  const rules = usePointRules();
   const [state, setState] = useState(() => initialState(chore, me, today, people.length > 1));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -231,7 +238,7 @@ export function ChoreForm({
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Field label="Category" htmlFor="category">
           <NativeSelect
             id="category"
@@ -257,6 +264,18 @@ export function ChoreForm({
               </option>
             ))}
           </NativeSelect>
+        </Field>
+        <Field label="Points" htmlFor="points">
+          <Input
+            id="points"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={100}
+            value={state.points}
+            onChange={(e) => set("points", e.target.value)}
+            placeholder={`${rules[state.priority]} (default)`}
+          />
         </Field>
       </div>
 

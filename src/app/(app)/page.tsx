@@ -20,6 +20,9 @@ import { TaskRow } from "@/components/tasks/task-row";
 import { DayTodos } from "@/components/tasks/day-todos";
 import { BuyToday } from "@/components/shopping/buy-today";
 import { getShoppingSummary } from "@/lib/shopping";
+import { getMonthScores, getPointRules } from "@/lib/points-data";
+import { PointRulesProvider } from "@/components/points/rules-context";
+import { MonthScoreLine } from "@/components/points/month-score-line";
 import { DayReminderRow } from "@/components/reminders/day-reminder";
 import type { Leave, Person, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -313,15 +316,18 @@ async function Today({
   const today = todayIST(now);
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today;
   const view: View = params.view === "couple" && partner ? "couple" : "mine";
-  const [occurrences, flexible, leaves, tasks, reminders, shopping] = await Promise.all([
-    getChoresForDay(date),
-    getFlexibleForDay(date),
-    getLeavesOn(date),
-    getTasksForDay(date, today),
-    getRemindersForDay(date),
-    // The shopping list isn't dated, so it only shows on today.
-    date === today ? getShoppingSummary() : null,
-  ]);
+  const [occurrences, flexible, leaves, tasks, reminders, shopping, rules, scores] =
+    await Promise.all([
+      getChoresForDay(date),
+      getFlexibleForDay(date),
+      getLeavesOn(date),
+      getTasksForDay(date, today),
+      getRemindersForDay(date),
+      // The shopping list isn't dated, so it only shows on today.
+      date === today ? getShoppingSummary() : null,
+      getPointRules(),
+      getMonthScores(),
+    ]);
   // Mine: what you do today. Couple: only shared chores (together and taking turns);
   // "just me" chores stay private to each of you.
   const isShared = (c: { assignment_type: string }) => c.assignment_type !== "fixed";
@@ -358,7 +364,7 @@ async function Today({
   const noChores = visible.length === 0 && visibleFlexible.length === 0;
 
   return (
-    <>
+    <PointRulesProvider rules={rules}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">
           {greeting(now)}, {me.name}
@@ -368,6 +374,7 @@ async function Today({
             Your partner hasn&apos;t been added yet. Create their account in Supabase.
           </p>
         )}
+        <MonthScoreLine scores={scores} people={people} meId={me.id} />
       </div>
 
       {partner && <ViewSwitch date={date} today={today} view={view} />}
@@ -454,7 +461,7 @@ async function Today({
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       )}
-    </>
+    </PointRulesProvider>
   );
 }
 

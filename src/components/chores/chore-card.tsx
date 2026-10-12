@@ -12,12 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PersonDot } from "@/components/person-dot";
+import { PointsPill } from "@/components/points/points-pill";
+import { usePointRules } from "@/components/points/rules-context";
 import {
   handOverOccurrence,
   setOccurrenceDone,
   takeBackOccurrence,
 } from "@/app/(app)/chores/actions";
 import { categoryMeta, formatTime, priorityMeta } from "@/lib/chore-meta";
+import { pointsFor } from "@/lib/points";
 import type { OccurrenceWithChore } from "@/lib/chores";
 import { cn } from "@/lib/utils";
 import { HandOverDialog } from "./hand-over-dialog";
@@ -79,6 +82,12 @@ export function ChoreCard({
   const time = formatTime(occurrence.due_time);
   const turnOf = showTurn && !done ? personById(people, occurrence.assignee_id) : null;
   const moved = movedNote(occurrence, people, meId);
+  const rules = usePointRules();
+  const base = pointsFor(chore, rules);
+  // Covering for someone (or doing a together chore alone) earns the bonus too.
+  const covering =
+    occurrence.assignee_id !== null && occurrence.original_assignee_id !== occurrence.assignee_id;
+  const points = base > 0 && covering ? base + rules.cover_bonus : base;
   const canHandOver =
     !readOnly && !done && !paused && partner !== null && occurrence.assignee_id !== partner.id;
 
@@ -95,6 +104,7 @@ export function ChoreCard({
       setDone(checked);
       const result = await setOccurrenceDone(occurrence.id, checked);
       if (!result.ok) toast.error(result.error);
+      else if (checked && points > 0) toast.success(`+${points} points 🎉`);
     });
   }
 
@@ -150,10 +160,13 @@ export function ChoreCard({
           <Undo2 /> Take back
         </Button>
       ) : (
-        <span
-          className={cn("size-2 shrink-0 rounded-full", priority.dot)}
-          title={`${priority.label} priority`}
-        />
+        <>
+          {!paused && <PointsPill points={points} />}
+          <span
+            className={cn("size-2 shrink-0 rounded-full", priority.dot)}
+            title={`${priority.label} priority`}
+          />
+        </>
       )}
 
       {canHandOver && partner && (

@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/page-header";
 import { todayIST } from "@/lib/dates";
 import { getHousehold } from "@/lib/household";
 import { getTasks } from "@/lib/tasks";
+import { getPointRules } from "@/lib/points-data";
+import { PointRulesProvider } from "@/components/points/rules-context";
 import { TasksView, type Tab } from "./tasks-view";
 
 export const metadata: Metadata = { title: "Plans" };
@@ -11,21 +13,24 @@ export const metadata: Metadata = { title: "Plans" };
 const TABS: Tab[] = ["plans", "mine", "couple"];
 
 async function Plans({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const [{ people }, tasks, { tab }] = await Promise.all([
+  const [{ people }, tasks, { tab }, rules] = await Promise.all([
     getHousehold(),
     getTasks(),
     searchParams,
+    getPointRules(),
   ]);
   const initialTab = TABS.find((t) => t === tab) ?? "plans";
   return (
-    <TasksView
-      key={initialTab}
-      tasks={tasks}
-      people={people}
-      me={people[0]}
-      today={todayIST()}
-      initialTab={initialTab}
-    />
+    <PointRulesProvider rules={rules}>
+      <TasksView
+        key={initialTab}
+        tasks={tasks}
+        people={people}
+        me={people[0]}
+        today={todayIST()}
+        initialTab={initialTab}
+      />
+    </PointRulesProvider>
   );
 }
 

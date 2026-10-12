@@ -12,10 +12,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PersonDot } from "@/components/person-dot";
+import { PointsPill } from "@/components/points/points-pill";
+import { usePointRules } from "@/components/points/rules-context";
 import { personById, type Person } from "@/components/chores/people";
 import { deleteTask, setTaskDone } from "@/app/(app)/plans/actions";
 import { formatTime, priorityMeta } from "@/lib/chore-meta";
 import { relativeDay, type DateStr } from "@/lib/dates";
+import { pointsFor, taskEarnsPoints } from "@/lib/points";
 import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -49,12 +52,15 @@ export function TaskRow({
   const when = whenLabel(task, today);
   const assignee = personById(people, task.assignee_id);
   const completedBy = personById(people, task.completed_by);
+  const rules = usePointRules();
+  const points = taskEarnsPoints(task) ? pointsFor(task, rules) : 0;
 
   function toggle(checked: boolean) {
     startTransition(async () => {
       setDone(checked);
       const result = await setTaskDone(task.id, checked);
       if (!result.ok) toast.error(result.error);
+      else if (checked && points > 0) toast.success(`+${points} points 🎉`);
     });
   }
 
@@ -113,6 +119,7 @@ export function TaskRow({
           <p className="text-muted-foreground mt-0.5 truncate text-xs">{task.notes}</p>
         )}
       </div>
+      <PointsPill points={points} />
       <span
         className={cn("size-2 shrink-0 rounded-full", priority.dot)}
         title={`${priority.label} priority`}

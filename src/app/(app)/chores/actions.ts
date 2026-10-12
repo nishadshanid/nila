@@ -97,6 +97,24 @@ export async function setOccurrenceDone(id: string, done: boolean): Promise<Acti
   return { ok: true };
 }
 
+/**
+ * Un-logs a flexible chore: back to pending first (the points trigger reverses
+ * what it earned), then the row goes. Deleting alone would keep the points.
+ */
+async function unlog(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  choreId: string,
+  date: string,
+) {
+  const { error } = await supabase
+    .from("chore_occurrences")
+    .update({ status: "pending", completed_by: null, completed_at: null })
+    .eq("chore_id", choreId)
+    .eq("date", date);
+  if (error) return { error };
+  return supabase.from("chore_occurrences").delete().eq("chore_id", choreId).eq("date", date);
+}
+
 /** Logs (or un-logs) a flexible chore like "gym 4 times a week" on one day. */
 export async function logFlexibleChore(
   choreId: string,
@@ -138,7 +156,7 @@ export async function logFlexibleChore(
         },
         { onConflict: "chore_id,date" },
       )
-    : await supabase.from("chore_occurrences").delete().eq("chore_id", choreId).eq("date", date);
+    : await unlog(supabase, choreId, date);
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true };

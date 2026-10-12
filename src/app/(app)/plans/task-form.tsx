@@ -13,6 +13,8 @@ import { PRIORITIES } from "@/lib/chore-meta";
 import { taskInputSchema, type TaskInput } from "@/lib/task-schema";
 import type { DateStr } from "@/lib/dates";
 import type { Task } from "@/lib/types";
+import { usePointRules } from "@/components/points/rules-context";
+import { taskEarnsPoints } from "@/lib/points";
 import { saveTask } from "./actions";
 
 export type TaskDefaults = Pick<TaskInput, "kind" | "visibility"> & { date?: string };
@@ -54,6 +56,7 @@ export function TaskForm({
     title: task?.title ?? "",
     notes: task?.notes ?? "",
     priority: task?.priority ?? ("med" as const),
+    points: task?.points?.toString() ?? "",
     visibility: task?.visibility ?? defaults.visibility,
     assignee: task?.assignee_id ?? "both",
     date: task?.date ?? defaults.date ?? (defaults.kind === "plan" ? today : ""),
@@ -61,6 +64,8 @@ export function TaskForm({
     end_date: task?.end_date ?? "",
     remind_before_min: task?.remind_before_min?.toString() ?? "",
   }));
+  const rules = usePointRules();
+  const earnsPoints = taskEarnsPoints(state);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const set = <K extends keyof typeof state>(key: K, value: (typeof state)[K]) =>
@@ -76,6 +81,7 @@ export function TaskForm({
       title: state.title,
       notes: state.notes,
       priority: state.priority,
+      points: state.points === "" ? null : Number(state.points),
       visibility: state.visibility,
       assignee_id: state.assignee === "both" ? null : state.assignee,
       date: state.date,
@@ -171,6 +177,22 @@ export function TaskForm({
           }))}
         />
       </Field>
+
+      {earnsPoints && (
+        <Field label="Points" htmlFor="points">
+          <Input
+            id="points"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={100}
+            value={state.points}
+            onChange={(e) => set("points", e.target.value)}
+            placeholder={`${rules[state.priority]} (default)`}
+            className="w-32"
+          />
+        </Field>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Field label={state.kind === "plan" ? "Date" : "Due date (optional)"} htmlFor="date">

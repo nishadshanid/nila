@@ -25,6 +25,8 @@ export const choreInputSchema = z
       .optional()
       .transform((v) => v || null),
     priority: z.enum(["low", "med", "high"]),
+    // Own points; empty = the priority's points.
+    points: optionalInt(0, 100),
     assignment_type: z.enum(["fixed", "rotating", "together"]),
     fixed_assignee: z.uuid().nullable().optional(),
     rotation_order: z.array(z.uuid()).nullable().optional(),

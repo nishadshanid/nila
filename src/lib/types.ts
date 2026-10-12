@@ -26,6 +26,8 @@ export type Chore = {
   category: string;
   notes: string | null;
   priority: Priority;
+  /** Own points; null = the priority's points. */
+  points: number | null;
   assignment_type: AssignmentType;
   fixed_assignee: string | null;
   rotation_order: string[] | null;
@@ -92,6 +94,7 @@ export type Task = {
   title: string;
   notes: string | null;
   priority: Priority;
+  points: number | null;
   visibility: Visibility;
   owner_id: string;
   /** Couple tasks: who does it. Null = both of you. */
