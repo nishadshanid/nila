@@ -60,7 +60,6 @@ export async function getFlexibleForDay(date: DateStr): Promise<FlexibleProgress
     .select("*")
     .eq("active", true)
     .not("flex_target", "is", null)
-    .lte("start_date", date)
     .order("title");
   if (error) throw new Error(`Could not load flexible chores: ${error.message}`);
   if (chores.length === 0) return [];
@@ -81,7 +80,10 @@ export async function getFlexibleForDay(date: DateStr): Promise<FlexibleProgress
     .order("date");
   if (logError) throw new Error(`Could not load flexible progress: ${logError.message}`);
 
-  return (chores as Chore[]).map((chore) => {
+  // A chore that starts mid-week still counts for that whole week (or month),
+  // so you can log earlier days of the period it starts in.
+  const started = (chores as Chore[]).filter((c) => c.start_date <= flexPeriod(c.freq, date).to);
+  return started.map((chore) => {
     const period = flexPeriod(chore.freq, date);
     const doneDates = logged
       .filter((o) => o.chore_id === chore.id && o.date >= period.from && o.date <= period.to)

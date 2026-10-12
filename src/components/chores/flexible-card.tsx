@@ -81,23 +81,22 @@ export function FlexibleCard({
             />
           ))}
         </div>
-        {!readOnly && canLog && (
-          <Button
-            size="sm"
-            variant={doneOnDate ? "secondary" : "default"}
-            disabled={pending}
-            onClick={toggle}
-            aria-pressed={doneOnDate}
-          >
-            {doneOnDate ? (
-              <>
-                <Check /> Done {dayLabel}
-              </>
-            ) : (
-              `Done ${dayLabel}?`
-            )}
-          </Button>
-        )}
+        {!readOnly &&
+          canLog &&
+          (doneOnDate ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="text-primary flex items-center gap-1 text-sm font-medium">
+                <Check className="size-4" /> Done {dayLabel}
+              </span>
+              <Button size="sm" variant="ghost" disabled={pending} onClick={toggle}>
+                Undo
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" disabled={pending} onClick={toggle} className="shrink-0">
+              Mark done {dayLabel}
+            </Button>
+          ))}
       </div>
 
       {doneDates.length > 0 && (

@@ -50,6 +50,7 @@ function DayNav({ date, today, view }: { date: DateStr; today: DateStr; view: Vi
       <Button
         variant="ghost"
         size="icon"
+        nativeButton={false}
         render={<Link href={todayHref(addDays(date, -1), today, view)} aria-label="Previous day" />}
       >
         <ChevronLeft />
@@ -61,6 +62,7 @@ function DayNav({ date, today, view }: { date: DateStr; today: DateStr; view: Vi
       <Button
         variant="ghost"
         size="icon"
+        nativeButton={false}
         render={<Link href={todayHref(addDays(date, 1), today, view)} aria-label="Next day" />}
       >
         <ChevronRight />
@@ -99,7 +101,7 @@ function Progress({ occurrences }: { occurrences: OccurrenceWithChore[] }) {
   return (
     <div className="mb-6 rounded-xl border p-4">
       <div className="mb-2 flex items-baseline justify-between text-sm">
-        <span className="font-medium">Done together</span>
+        <span className="font-medium">Shared chores done</span>
         <span className="text-muted-foreground">
           {done} of {occurrences.length}
         </span>
@@ -125,13 +127,16 @@ function ChoreSection({
   person,
   occurrences,
   people,
-  readOnly,
+  meId,
+  showTurn = false,
 }: {
   title: string;
   person?: Person;
   occurrences: OccurrenceWithChore[];
   people: Person[];
-  readOnly?: boolean;
+  meId: string;
+  /** Show whose turn it is on each card (for rotating chores). */
+  showTurn?: boolean;
 }) {
   if (occurrences.length === 0) return null;
   const done = occurrences.filter((o) => o.status === "done").length;
@@ -146,7 +151,14 @@ function ChoreSection({
       </h2>
       <ul className="flex flex-col gap-2">
         {occurrences.map((o) => (
-          <ChoreCard key={o.id} occurrence={o} people={people} readOnly={readOnly} />
+          <ChoreCard
+            key={o.id}
+            occurrence={o}
+            people={people}
+            showTurn={showTurn}
+            // Only the person whose turn it is can tick it; together chores are anyone's.
+            readOnly={o.assignee_id !== null && o.assignee_id !== meId}
+          />
         ))}
       </ul>
     </section>
@@ -200,15 +212,20 @@ async function Today({
     getChoresForDay(date),
     getFlexibleForDay(date),
   ]);
-  const myFlexible = flexible.filter(
-    (f) => f.chore.assignment_type !== "fixed" || f.chore.fixed_assignee === me.id,
+  // Mine: what you do today. Couple: only shared chores (together and taking turns);
+  // "just me" chores stay private to each of you.
+  const isShared = (c: { assignment_type: string }) => c.assignment_type !== "fixed";
+  const visibleFlexible = flexible.filter((f) =>
+    view === "couple"
+      ? isShared(f.chore)
+      : f.chore.assignment_type !== "fixed" || f.chore.fixed_assignee === me.id,
   );
-  const visibleFlexible = view === "couple" ? flexible : myFlexible;
 
   const mine = occurrences.filter((o) => o.assignee_id === me.id);
   const together = occurrences.filter((o) => o.assignee_id === null);
-  const theirs = occurrences.filter((o) => partner && o.assignee_id === partner.id);
-  const visible = view === "couple" ? occurrences : [...mine, ...together];
+  const turns = occurrences.filter((o) => o.chore.assignment_type === "rotating");
+  const shared = occurrences.filter((o) => isShared(o.chore));
+  const visible = view === "couple" ? shared : [...mine, ...together];
 
   return (
     <>
@@ -228,31 +245,34 @@ async function Today({
 
       {visible.length === 0 && visibleFlexible.length === 0 ? (
         <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
-          {view === "mine" ? "Nothing for you on this day." : "No chores on this day."}{" "}
+          {view === "mine" ? "Nothing for you on this day." : "No shared chores on this day."}{" "}
           <Link href="/chores" className="underline">
             Set up chores
           </Link>
         </div>
       ) : view === "mine" ? (
         <>
-          <ChoreSection title="Your chores" person={me} occurrences={mine} people={people} />
-          <ChoreSection title="Together" occurrences={together} people={people} />
+          <ChoreSection
+            title="Your chores"
+            person={me}
+            occurrences={mine}
+            people={people}
+            meId={me.id}
+          />
+          <ChoreSection title="Together" occurrences={together} people={people} meId={me.id} />
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       ) : (
         <>
-          {occurrences.length > 0 && <Progress occurrences={occurrences} />}
-          <ChoreSection title="You" person={me} occurrences={mine} people={people} />
-          <ChoreSection title="Together" occurrences={together} people={people} />
-          {partner && (
-            <ChoreSection
-              title={partner.name}
-              person={partner}
-              occurrences={theirs}
-              people={people}
-              readOnly
-            />
-          )}
+          {shared.length > 0 && <Progress occurrences={shared} />}
+          <ChoreSection title="Together" occurrences={together} people={people} meId={me.id} />
+          <ChoreSection
+            title="Taking turns"
+            occurrences={turns}
+            people={people}
+            meId={me.id}
+            showTurn
+          />
           <FlexibleSection items={visibleFlexible} date={date} today={today} meId={me.id} />
         </>
       )}

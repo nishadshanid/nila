@@ -18,10 +18,13 @@ export function ChoreCard({
   occurrence,
   people,
   readOnly = false,
+  showTurn = false,
 }: {
   occurrence: OccurrenceWithChore;
   people: Person[];
   readOnly?: boolean;
+  /** Show whose turn it is (for rotating chores in the Couple view). */
+  showTurn?: boolean;
 }) {
   const { chore } = occurrence;
   const [done, setDone] = useOptimistic(occurrence.status === "done");
@@ -30,6 +33,7 @@ export function ChoreCard({
   const priority = priorityMeta(chore.priority);
   const completedBy = personById(people, occurrence.completed_by);
   const time = formatTime(occurrence.due_time);
+  const turnOf = showTurn ? personById(people, occurrence.assignee_id) : null;
   const details = time;
 
   function toggle(checked: boolean) {
@@ -61,7 +65,13 @@ export function ChoreCard({
       <Icon className="text-muted-foreground size-4 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className={cn("truncate font-medium", done && "line-through")}>{chore.title}</p>
-        {(details || (done && completedBy)) && (
+        {turnOf && !done && (
+          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <PersonDot profile={turnOf} /> {turnOf.name}&apos;s turn
+            {details && ` · ${details}`}
+          </p>
+        )}
+        {!(turnOf && !done) && (details || (done && completedBy)) && (
           <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
             {details}
             {details && done && completedBy && " · "}
