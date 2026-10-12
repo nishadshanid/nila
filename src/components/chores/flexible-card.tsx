@@ -38,6 +38,10 @@ export function FlexibleCard({
   const Icon = categoryMeta(chore.category).icon;
   const priority = priorityMeta(chore.priority);
   const periodName = chore.freq === "monthly" ? "this month" : "this week";
+  const periodRange =
+    chore.freq === "monthly"
+      ? formatDay(progress.period.from, "MMMM")
+      : `${formatDay(progress.period.from, "d MMM")} – ${formatDay(progress.period.to, "d MMM")}`;
 
   function toggle() {
     startTransition(async () => {
@@ -54,8 +58,7 @@ export function FlexibleCard({
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{chore.title}</p>
           <p className="text-muted-foreground text-xs">
-            {count} of {target} {periodName}
-            {reached && " · goal reached 🎉"}
+            {count} of {target} {periodName} ({periodRange}){reached && " · goal reached 🎉"}
           </p>
         </div>
         <span
@@ -99,11 +102,12 @@ export function FlexibleCard({
           ))}
       </div>
 
-      {doneDates.length > 0 && (
-        <p className="text-muted-foreground text-xs">
-          Done on {doneDates.map((d) => formatDay(d, "EEE d")).join(", ")}
-        </p>
-      )}
+      <p className="text-muted-foreground text-xs">
+        {doneDates.length > 0 &&
+          `Done on ${doneDates.map((d) => formatDay(d, "EEE d")).join(", ")} · `}
+        {chore.freq === "monthly" ? "Last month" : "Last week"}: {progress.previousCount} of{" "}
+        {target}
+      </p>
     </li>
   );
 }

@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { ensureOccurrences } from "@/lib/occurrences";
-import type { DateStr } from "@/lib/dates";
+import { addDays, type DateStr } from "@/lib/dates";
 import { flexPeriod } from "@/lib/recurrence";
 import type { Chore, ChoreOccurrence } from "@/lib/types";
 
@@ -50,6 +50,8 @@ export type FlexibleProgress = {
   doneDates: DateStr[];
   /** Whether it was logged on the day being viewed. */
   doneOnDate: boolean;
+  /** How many times it was done in the previous week/month. */
+  previousCount: number;
 };
 
 /** Flexible chores ("4 times a week") with their progress in the period containing `date`. */
@@ -64,9 +66,11 @@ export async function getFlexibleForDay(date: DateStr): Promise<FlexibleProgress
   if (error) throw new Error(`Could not load flexible chores: ${error.message}`);
   if (chores.length === 0) return [];
 
-  // One query covering both the week and the month around `date`.
+  // One query covering this and the previous week and month around `date`.
   const week = flexPeriod("weekly", date);
   const month = flexPeriod("monthly", date);
+  const lastWeek = flexPeriod("weekly", addDays(week.from, -1));
+  const lastMonth = flexPeriod("monthly", addDays(month.from, -1));
   const { data: logged, error: logError } = await supabase
     .from("chore_occurrences")
     .select("chore_id, date")
@@ -75,7 +79,7 @@ export async function getFlexibleForDay(date: DateStr): Promise<FlexibleProgress
       chores.map((c) => c.id),
     )
     .eq("status", "done")
-    .gte("date", week.from < month.from ? week.from : month.from)
+    .gte("date", lastWeek.from < lastMonth.from ? lastWeek.from : lastMonth.from)
     .lte("date", week.to > month.to ? week.to : month.to)
     .order("date");
   if (logError) throw new Error(`Could not load flexible progress: ${logError.message}`);
@@ -85,9 +89,18 @@ export async function getFlexibleForDay(date: DateStr): Promise<FlexibleProgress
   const started = (chores as Chore[]).filter((c) => c.start_date <= flexPeriod(c.freq, date).to);
   return started.map((chore) => {
     const period = flexPeriod(chore.freq, date);
-    const doneDates = logged
-      .filter((o) => o.chore_id === chore.id && o.date >= period.from && o.date <= period.to)
-      .map((o) => o.date as DateStr);
-    return { chore, period, doneDates, doneOnDate: doneDates.includes(date) };
+    const previous = flexPeriod(chore.freq, addDays(period.from, -1));
+    const datesIn = (p: { from: DateStr; to: DateStr }) =>
+      logged
+        .filter((o) => o.chore_id === chore.id && o.date >= p.from && o.date <= p.to)
+        .map((o) => o.date as DateStr);
+    const doneDates = datesIn(period);
+    return {
+      chore,
+      period,
+      doneDates,
+      doneOnDate: doneDates.includes(date),
+      previousCount: datesIn(previous).length,
+    };
   });
 }
