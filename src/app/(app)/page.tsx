@@ -18,6 +18,8 @@ import { getRemindersForDay, type DayReminder } from "@/lib/reminders";
 import { getTasksForDay } from "@/lib/tasks";
 import { TaskRow } from "@/components/tasks/task-row";
 import { DayTodos } from "@/components/tasks/day-todos";
+import { BuyToday } from "@/components/shopping/buy-today";
+import { getShoppingSummary } from "@/lib/shopping";
 import { DayReminderRow } from "@/components/reminders/day-reminder";
 import type { Leave, Person, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -311,12 +313,14 @@ async function Today({
   const today = todayIST(now);
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today;
   const view: View = params.view === "couple" && partner ? "couple" : "mine";
-  const [occurrences, flexible, leaves, tasks, reminders] = await Promise.all([
+  const [occurrences, flexible, leaves, tasks, reminders, shopping] = await Promise.all([
     getChoresForDay(date),
     getFlexibleForDay(date),
     getLeavesOn(date),
     getTasksForDay(date, today),
     getRemindersForDay(date),
+    // The shopping list isn't dated, so it only shows on today.
+    date === today ? getShoppingSummary() : null,
   ]);
   // Mine: what you do today. Couple: only shared chores (together and taking turns);
   // "just me" chores stay private to each of you.
@@ -372,6 +376,15 @@ async function Today({
 
       <ReminderSection items={dayReminders} />
       <TaskSection title="Plans" tasks={plans} people={people} meId={me.id} today={today} />
+      {shopping && (
+        <BuyToday
+          items={shopping.today}
+          weekCount={shopping.weekCount}
+          people={people}
+          meId={me.id}
+          today={today}
+        />
+      )}
 
       {view === "mine" ? (
         <DayTodos

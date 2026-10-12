@@ -1,17 +1,33 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { ShoppingCart } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { ComingSoon } from "@/components/coming-soon";
+import { todayIST } from "@/lib/dates";
+import { getHousehold } from "@/lib/household";
+import { getShoppingItems, pastNames } from "@/lib/shopping";
+import { ShoppingView } from "./shopping-view";
 
 export const metadata: Metadata = { title: "Shopping" };
 
-export default function Page() {
+async function Shopping() {
+  const [{ me, people }, items] = await Promise.all([getHousehold(), getShoppingItems()]);
+  return (
+    <ShoppingView
+      items={items}
+      names={pastNames(items)}
+      people={people}
+      me={me}
+      today={todayIST()}
+    />
+  );
+}
+
+export default function ShoppingPage() {
   return (
     <>
-      <PageHeader title="Shopping" description="Things to buy, by urgency." />
-      <ComingSoon icon={ShoppingCart} phase={4}>
-        Add items as you notice them, grouped by today, this week, this month or someday.
-      </ComingSoon>
+      <PageHeader title="Shopping" description="Things to buy, shared by both of you." />
+      <Suspense fallback={<div className="bg-muted h-40 animate-pulse rounded-xl" />}>
+        <Shopping />
+      </Suspense>
     </>
   );
 }

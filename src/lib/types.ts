@@ -130,3 +130,21 @@ export type Reminder = {
   created_at: string;
   updated_at: string;
 };
+
+export type Urgency = "today" | "this_week" | "this_month" | "someday";
+
+export type ShoppingItem = {
+  id: string;
+  name: string;
+  qty: number | null;
+  unit: string | null;
+  category: string;
+  urgency: Urgency;
+  notes: string | null;
+  status: "needed" | "bought";
+  added_by: string;
+  bought_by: string | null;
+  bought_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
