@@ -32,8 +32,7 @@ export const choreInputSchema = z
     by_weekday: z.array(z.number().int().min(1).max(7)).nullable().optional(),
     by_monthday: optionalInt(1, 31),
     due_time: z
-      .string()
-      .regex(/^\d{2}:\d{2}(:\d{2})?$/)
+      .union([z.literal(""), z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Enter a valid time")])
       .nullable()
       .optional()
       .transform((v) => v || null),
