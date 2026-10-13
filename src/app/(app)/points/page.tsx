@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import Link from "next/link";
 import { Crown, Trophy } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -229,6 +230,8 @@ async function Points({
   searchParams: Promise<{ month?: string; tab?: string }>;
 }) {
   const params = await searchParams;
+  // The current month depends on the clock: render per visit, not ahead of time.
+  await connection();
   if (params.tab === "stats") {
     const { me, people } = await getHousehold();
     return (
