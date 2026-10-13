@@ -118,3 +118,15 @@ export async function getChoreDays(people: string[], from: string, to: string) {
   }
   return new Map([...days].map(([id, map]) => [id, [...map].map(([date, d]) => ({ date, ...d }))]));
 }
+
+/** Points you earned today (IST), net of anything undone. */
+export async function getPointsToday(userId: string, today: string): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("points_ledger")
+    .select("points")
+    .eq("user_id", userId)
+    .gte("earned_at", `${today}T00:00:00+05:30`);
+  if (error) throw new Error(`Could not load today's points: ${error.message}`);
+  return data.reduce((sum, r) => sum + (r.points as number), 0);
+}

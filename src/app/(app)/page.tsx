@@ -20,7 +20,8 @@ import { TaskRow } from "@/components/tasks/task-row";
 import { DayTodos } from "@/components/tasks/day-todos";
 import { BuyToday } from "@/components/shopping/buy-today";
 import { getShoppingSummary } from "@/lib/shopping";
-import { getMonthScores, getPointRules } from "@/lib/points-data";
+import { getMonthScores, getPointRules, getPointsToday } from "@/lib/points-data";
+import { DayComplete } from "@/components/celebrate/day-complete";
 import { PointRulesProvider } from "@/components/points/rules-context";
 import { MonthScoreLine } from "@/components/points/month-score-line";
 import { DayReminderRow } from "@/components/reminders/day-reminder";
@@ -363,6 +364,14 @@ async function Today({
   const visible = view === "couple" ? shared : [...mine, ...together, ...handedOver];
   const noChores = visible.length === 0 && visibleFlexible.length === 0;
 
+  // Everything for today ticked off? (Paused chores and ones you handed over don't count.)
+  const work = [
+    ...(view === "couple" ? shared : [...mine, ...together]).filter((o) => o.status !== "skipped"),
+    ...todos,
+  ];
+  const allDone = date === today && work.length > 0 && work.every((item) => item.status === "done");
+  const pointsToday = allDone && view === "mine" ? await getPointsToday(me.id, today) : null;
+
   return (
     <PointRulesProvider rules={rules}>
       <div className="mb-6">
@@ -380,6 +389,15 @@ async function Today({
       {partner && <ViewSwitch date={date} today={today} view={view} />}
       <DayNav date={date} today={today} view={view} />
       <LeaveBanner leaves={leaves} me={me} partner={partner} />
+      {allDone && (
+        <DayComplete
+          date={date}
+          view={view}
+          count={work.length}
+          points={pointsToday}
+          partnerName={partner?.name ?? null}
+        />
+      )}
 
       <ReminderSection items={dayReminders} />
       <TaskSection title="Plans" tasks={plans} people={people} meId={me.id} today={today} />
