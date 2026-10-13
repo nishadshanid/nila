@@ -5,29 +5,44 @@ import type { Reminder } from "@/lib/types";
 export type ReminderRule = Pick<
   Reminder,
   "freq" | "start_date" | "interval_days" | "by_weekday" | "by_monthday"
->;
+> &
+  Partial<Pick<Reminder, "type">>;
+
+/**
+ * Birthdays and anniversaries happen every year on their day and month. Their
+ * year is only for the age ("turns 30"), so it never delays the reminder, even
+ * if it's this year's or next year's date.
+ */
+export function isAnnual(rule: Pick<ReminderRule, "type">) {
+  return rule.type === "birthday" || rule.type === "anniversary";
+}
 
 /** Whether the reminder happens on `date`. */
 export function reminderOccursOn(rule: ReminderRule, date: DateStr): boolean {
-  if (date < rule.start_date) return false;
+  const annual = isAnnual(rule);
+  if (!annual && date < rule.start_date) return false;
+  if (annual) return onSameDay(rule.start_date, date);
   switch (rule.freq) {
     case "once":
       return date === rule.start_date;
-    case "yearly": {
-      const month = rule.start_date.slice(5, 7);
-      const day = Number(rule.start_date.slice(8, 10));
-      if (date.slice(5, 7) !== month) return false;
-      // A 29 Feb birthday is celebrated on 28 Feb in other years.
-      return Number(date.slice(8, 10)) === Math.min(day, daysInMonth(date));
-    }
+    case "yearly":
+      return onSameDay(rule.start_date, date);
     default:
       return occursOn({ ...rule, freq: rule.freq, flex_target: null }, date);
   }
 }
 
+/** Whether `date` has the same day and month as `start`. */
+function onSameDay(start: DateStr, date: DateStr) {
+  const day = Number(start.slice(8, 10));
+  if (date.slice(5, 7) !== start.slice(5, 7)) return false;
+  // A 29 Feb birthday is celebrated on 28 Feb in other years.
+  return Number(date.slice(8, 10)) === Math.min(day, daysInMonth(date));
+}
+
 /** The first date on or after `from` the reminder happens, within a year. */
 export function nextOccurrence(rule: ReminderRule, from: DateStr): DateStr | null {
-  const start = from < rule.start_date ? rule.start_date : from;
+  const start = !isAnnual(rule) && from < rule.start_date ? rule.start_date : from;
   for (let d = start, i = 0; i <= 366; d = addDays(d, 1), i++) {
     if (reminderOccursOn(rule, d)) return d;
   }

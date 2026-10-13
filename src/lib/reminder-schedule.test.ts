@@ -22,6 +22,36 @@ describe("reminders", () => {
     expect(nextOccurrence(birthday, "2026-10-12")).toBe("2027-03-14");
   });
 
+  it("a birthday entered with a future year still comes every year, from now", () => {
+    const upcoming = { ...birthday, type: "birthday" as const, start_date: "2027-03-01" };
+    expect(reminderOccursOn(upcoming, "2026-03-01")).toBe(true);
+    expect(reminderOccursOn(upcoming, "2027-03-01")).toBe(true);
+    expect(reminderOccursOn(upcoming, "2031-03-01")).toBe(true);
+    expect(nextOccurrence(upcoming, "2026-10-13")).toBe("2027-03-01");
+    // A heads-up the day before works too.
+    expect(reminderOnDay({ ...upcoming, lead_days: 1 }, "2027-02-28")).toEqual({
+      date: "2027-03-01",
+      inDays: 1,
+    });
+  });
+
+  it("anniversaries repeat every year even if saved as one-off", () => {
+    const wedding = {
+      ...birthday,
+      type: "anniversary" as const,
+      freq: "once" as const,
+      start_date: "2026-11-20",
+    };
+    expect(reminderOccursOn(wedding, "2026-11-20")).toBe(true);
+    expect(reminderOccursOn(wedding, "2030-11-20")).toBe(true);
+  });
+
+  it("other yearly reminders still start on their date", () => {
+    const insurance = { ...birthday, type: "custom" as const, start_date: "2027-03-01" };
+    expect(reminderOccursOn(insurance, "2026-03-01")).toBe(false);
+    expect(reminderOccursOn(insurance, "2027-03-01")).toBe(true);
+  });
+
   it("a 29 Feb birthday falls on 28 Feb in other years", () => {
     const leap = { ...birthday, start_date: "1996-02-29" };
     expect(reminderOccursOn(leap, "2027-02-28")).toBe(true);

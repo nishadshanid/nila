@@ -300,6 +300,14 @@ export function ReminderForm({
       </div>
       {yearly && (
         <p className="text-muted-foreground -mt-3 text-xs">
+          🔁 Repeats every year on this day.{" "}
+          {state.type === "birthday"
+            ? 'Use the year they were born to see their age ("turns 30"); any year works.'
+            : "Use the year it started to see how many years it's been; any year works."}
+        </p>
+      )}
+      {yearly && (
+        <p className="text-muted-foreground -mt-3 text-xs">
           Any year works; if you enter the real year, Nila shows the age or years.
         </p>
       )}

@@ -39,11 +39,16 @@ export const reminderInputSchema = z
       ctx.addIssue({ code: "custom", path: ["by_monthday"], message: "Pick a day of the month" });
     }
   })
-  .transform((r) => ({
-    ...r,
-    interval_days: r.freq === "daily" ? r.interval_days : 1,
-    by_weekday: r.freq === "weekly" ? [...new Set(r.by_weekday ?? [])].sort((a, b) => a - b) : null,
-    by_monthday: r.freq === "monthly" ? (r.by_monthday ?? null) : null,
-  }));
+  .transform((r) => {
+    // Birthdays and anniversaries always come back every year.
+    const freq = r.type === "birthday" || r.type === "anniversary" ? "yearly" : r.freq;
+    return {
+      ...r,
+      freq,
+      interval_days: freq === "daily" ? r.interval_days : 1,
+      by_weekday: freq === "weekly" ? [...new Set(r.by_weekday ?? [])].sort((a, b) => a - b) : null,
+      by_monthday: freq === "monthly" ? (r.by_monthday ?? null) : null,
+    };
+  });
 
 export type ReminderInput = z.input<typeof reminderInputSchema>;
