@@ -2,9 +2,9 @@
 // Data always comes from the network (it's shared between two phones and must be fresh);
 // only Next's versioned static files and the icons are cached.
 
-const CACHE = "nila-v2";
+const CACHE = "nila-v3";
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png"];
+const PRECACHE = [OFFLINE_URL, "/logo.png", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));

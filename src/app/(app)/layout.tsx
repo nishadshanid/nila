@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { Sidebar } from "@/components/nav/sidebar";
 import { BottomNav } from "@/components/nav/bottom-nav";
 import { UserChip } from "@/components/nav/user-chip";
@@ -10,15 +11,15 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-6 border-r p-4 md:flex">
-        <Link href="/" className="px-3 text-xl font-semibold tracking-tight">
-          Nila
+        <Link href="/" className="px-3" aria-label="Nila, today">
+          <Logo className="h-8" />
         </Link>
         <Sidebar />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="bg-background/95 sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 backdrop-blur">
-          <Link href="/" className="text-lg font-semibold tracking-tight md:invisible">
-            Nila
+          <Link href="/" className="md:invisible" aria-label="Nila, today">
+            <Logo />
           </Link>
           <div className="flex items-center gap-1">
             <Link

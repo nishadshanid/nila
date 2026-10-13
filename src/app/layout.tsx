@@ -30,7 +30,11 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#1e1b4b",
+  // The browser bar matches the app: logo cream in light mode, near-black in dark.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fbfaed" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
