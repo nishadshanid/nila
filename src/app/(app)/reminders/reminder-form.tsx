@@ -306,11 +306,6 @@ export function ReminderForm({
             : "Use the year it started to see how many years it's been; any year works."}
         </p>
       )}
-      {yearly && (
-        <p className="text-muted-foreground -mt-3 text-xs">
-          Any year works; if you enter the real year, Nila shows the age or years.
-        </p>
-      )}
 
       <Field label="Heads-up">
         <Segmented
@@ -319,7 +314,15 @@ export function ReminderForm({
           onChange={(v) => set("lead_days", Number(v))}
           options={LEAD_OPTIONS.map((d) => ({
             value: String(d),
-            label: d === 0 ? "On the day" : `${d} day${d === 1 ? "" : "s"} before`,
+            label:
+              d === 0 ? (
+                "Same day"
+              ) : (
+                <>
+                  {d} day{d === 1 ? "" : "s"}
+                  <span className="hidden sm:inline">before</span>
+                </>
+              ),
           }))}
         />
       </Field>
