@@ -128,17 +128,17 @@ export function ShoppingView({
                 <SlidersHorizontal />
               </Button>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Segmented
                 aria-label="When do you need it?"
                 value={urgency}
                 onChange={setUrgency}
-                className="flex-1"
+                className="min-w-0 sm:flex-1"
                 options={URGENCIES.map((u) => ({
                   value: u.value,
                   label: (
                     <>
-                      <span className={cn("size-1.5 rounded-full", u.dot)} />
+                      <span className={cn("size-1.5 shrink-0 rounded-full", u.dot)} />
                       {u.short}
                     </>
                   ),
@@ -148,7 +148,7 @@ export function ShoppingView({
                 aria-label="Category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-32 shrink-0"
+                className="w-full sm:w-36 sm:shrink-0"
               >
                 <option value="auto">
                   {guessed ? shoppingCategoryMeta(guessed).label : "Auto"}
