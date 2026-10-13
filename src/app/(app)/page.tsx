@@ -375,7 +375,7 @@ async function Today({
   return (
     <PointRulesProvider rules={rules}>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl font-semibold">
           {greeting(now)}, {me.name}
         </h1>
         {!partner && (
