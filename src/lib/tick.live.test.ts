@@ -22,6 +22,7 @@ describe.skipIf(!live)("tick (live database)", () => {
   const sent: { to: string; email: Email }[] = [];
   const send = async (to: string, email: Email) => void sent.push({ to, email });
   const take = () => sent.splice(0);
+  const channels = { send, push: async () => 0, emailReady: true, pushReady: false };
 
   beforeAll(async () => {
     const { data: profiles } = await db.from("profiles").select("id, name").order("created_at");
@@ -74,7 +75,7 @@ describe.skipIf(!live)("tick (live database)", () => {
       .single();
     taskId = task.data!.id;
 
-    const first = await runTick(db, { now: at("2030-01-07T09:45:00+05:30"), send });
+    const first = await runTick(db, { ...channels, now: at("2030-01-07T09:45:00+05:30"), send });
     expect(first.errors).toEqual([]);
     const emails = take();
     const reminders = emails.filter((e) => e.email.subject.includes("__tick_check chore"));
@@ -87,30 +88,49 @@ describe.skipIf(!live)("tick (live database)", () => {
   });
 
   it("sends nothing on a repeated tick", async () => {
-    await runTick(db, { now: at("2030-01-07T09:45:00+05:30"), send });
-    await runTick(db, { now: at("2030-01-07T10:00:00+05:30"), send });
+    await runTick(db, { ...channels, now: at("2030-01-07T09:45:00+05:30"), send });
+    await runTick(db, { ...channels, now: at("2030-01-07T10:00:00+05:30"), send });
     expect(take().filter((e) => e.email.subject.includes("__tick_check"))).toEqual([]);
   });
 
   it("doesn't remind outside the window", async () => {
-    await runTick(db, { now: at("2030-01-08T09:15:00+05:30"), send });
+    await runTick(db, { ...channels, now: at("2030-01-08T09:15:00+05:30"), send });
     expect(take().filter((e) => e.email.subject.includes("__tick_check"))).toEqual([]);
   });
 
   it("sends each person a morning digest with the chore, once", async () => {
-    await runTick(db, { now: at("2030-01-09T07:00:00+05:30"), send });
+    await runTick(db, { ...channels, now: at("2030-01-09T07:00:00+05:30"), send });
     const digests = take().filter((e) => e.email.subject.startsWith("☀️"));
     expect(digests).toHaveLength(people.length);
     expect(digests[0].email.text).toContain("__tick_check chore");
-    await runTick(db, { now: at("2030-01-09T07:15:00+05:30"), send });
+    await runTick(db, { ...channels, now: at("2030-01-09T07:15:00+05:30"), send });
     expect(take().filter((e) => e.email.subject.startsWith("☀️"))).toEqual([]);
   });
 
   it("sends the monthly summary once on the 1st", async () => {
-    await runTick(db, { now: at("2030-02-01T08:00:00+05:30"), send });
+    await runTick(db, { ...channels, now: at("2030-02-01T08:00:00+05:30"), send });
     const monthly = take().filter((e) => e.email.subject.startsWith("🏆 January 2030"));
     expect(monthly).toHaveLength(people.length);
-    await runTick(db, { now: at("2030-02-01T12:00:00+05:30"), send });
+    await runTick(db, { ...channels, now: at("2030-02-01T12:00:00+05:30"), send });
     expect(take().filter((e) => e.email.subject.startsWith("🏆"))).toEqual([]);
+  });
+
+  it("sends by push alone when email isn't set up, once", async () => {
+    const pushed: { userId: string; title: string }[] = [];
+    const pushOnly = {
+      send: async () => {
+        throw new Error("email should not be used");
+      },
+      push: async (_db: unknown, userId: string, m: { title: string }) => {
+        pushed.push({ userId, title: m.title });
+        return 1;
+      },
+      emailReady: false,
+      pushReady: true,
+    };
+    await runTick(db, { ...pushOnly, now: at("2030-01-10T09:45:00+05:30") });
+    await runTick(db, { ...pushOnly, now: at("2030-01-10T10:00:00+05:30") });
+    const reminders = pushed.filter((p) => p.title.includes("__tick_check chore"));
+    expect(reminders).toHaveLength(people.length);
   });
 });

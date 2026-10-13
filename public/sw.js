@@ -2,7 +2,7 @@
 // Data always comes from the network (it's shared between two phones and must be fresh);
 // only Next's versioned static files and the icons are cached.
 
-const CACHE = "nila-v1";
+const CACHE = "nila-v2";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png"];
 
@@ -48,4 +48,36 @@ self.addEventListener("fetch", (event) => {
       ),
     );
   }
+});
+
+// Phone notifications sent by the server (reminders, hand-overs, the morning summary).
+self.addEventListener("push", (event) => {
+  let message = { title: "Nila", body: "", path: "/" };
+  try {
+    message = { ...message, ...event.data.json() };
+  } catch {
+    if (event.data) message.body = event.data.text();
+  }
+  event.waitUntil(
+    self.registration.showNotification(message.title, {
+      body: message.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: message.tag,
+      data: { path: message.path || "/" },
+    }),
+  );
+});
+
+// Tapping a notification opens Nila (reusing an open window if there is one).
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.path || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => w.url.startsWith(self.location.origin));
+      if (open) return open.focus().then(() => open.navigate(url));
+      return self.clients.openWindow(url);
+    }),
+  );
 });

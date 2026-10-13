@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured } from "@/lib/email";
+import { pushConfigured } from "@/lib/push";
 import { runTick } from "@/lib/tick";
 
 // Supabase pg_cron calls this every 15 minutes (see the notifications migration).
@@ -17,10 +18,10 @@ function authorized(request: Request) {
 
 async function handle(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  if (!emailConfigured()) {
+  if (!emailConfigured() && !pushConfigured()) {
     // Nothing to send; the app still creates chore rows whenever it's opened.
     return Response.json(
-      { error: "Email isn't set up: add GMAIL_USER and GMAIL_APP_PASSWORD" },
+      { error: "Neither email (GMAIL_*) nor push (VAPID keys) is set up" },
       { status: 503 },
     );
   }

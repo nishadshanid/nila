@@ -9,6 +9,8 @@ import { RulesForm } from "./rules-form";
 import { NotificationsForm } from "./notifications-form";
 import { emailConfigured } from "@/lib/email";
 import { InstallApp } from "@/components/pwa/install-app";
+import { pushConfigured } from "@/lib/push";
+import { PushSettings } from "./push-settings";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -19,7 +21,14 @@ async function Profile() {
 
 async function Notifications() {
   const { me } = await getHousehold();
-  return <NotificationsForm profile={me} emailReady={emailConfigured()} />;
+  return (
+    <div className="flex flex-col gap-6">
+      <NotificationsForm profile={me} emailReady={emailConfigured()} />
+      <div className="border-t pt-6">
+        <PushSettings enabled={me.push_notifications} serverReady={pushConfigured()} />
+      </div>
+    </div>
+  );
 }
 
 async function Rules() {

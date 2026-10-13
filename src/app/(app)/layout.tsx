@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Sidebar } from "@/components/nav/sidebar";
 import { BottomNav } from "@/components/nav/bottom-nav";
 import { UserChip } from "@/components/nav/user-chip";
+import { LiveSync } from "@/components/realtime/live-sync";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
@@ -25,6 +26,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-24 md:pb-6">{children}</main>
       </div>
       <BottomNav />
+      <LiveSync />
     </div>
   );
 }

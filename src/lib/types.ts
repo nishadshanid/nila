@@ -7,6 +7,7 @@ export type Profile = {
   email: string;
   color: string;
   email_notifications: boolean;
+  push_notifications: boolean;
   digest_time: string;
   created_at: string;
   updated_at: string;

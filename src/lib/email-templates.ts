@@ -1,6 +1,14 @@
 // Plain, inline-styled emails: they read well in Gmail on a phone and degrade to text.
 
-export type Email = { subject: string; text: string; html: string };
+export type Email = {
+  subject: string;
+  text: string;
+  html: string;
+  /** One line for a phone notification (the subject is its title). */
+  short: string;
+  /** Where tapping the notification opens, e.g. "/shopping". */
+  path?: string;
+};
 
 export type Line = { title: string; detail?: string | null };
 
@@ -54,6 +62,7 @@ export function itemReminder(o: {
     subject,
     text: lines.join("\n") + footer(o.appUrl),
     html: layout(o.appUrl, o.title, p(`${o.kind} · ${o.when}`) + (o.note ? p(o.note) : "")),
+    short: [`${o.kind} · ${o.when}`, o.note].filter(Boolean).join(" · "),
   };
 }
 
@@ -99,6 +108,7 @@ export function dailyDigest(o: {
           )
           .join(""),
     ),
+    short: filled.map(([h, lines]) => `${h}: ${lines.map((l) => l.title).join(", ")}`).join(" · "),
   };
 }
 
@@ -117,6 +127,7 @@ export function handover(o: {
     subject: `🤝 ${o.from} handed you ${o.title}`,
     text: `Hi ${o.name},\n\n${line}${footer(o.appUrl)}`,
     html: layout(o.appUrl, `${o.from} handed you a chore`, p(line)),
+    short: line,
   };
 }
 
@@ -139,6 +150,8 @@ export function leaveAdded(o: {
       `${o.who} is ${o.state}`,
       p(line) + (o.note ? p(`Note: ${o.note}`) : ""),
     ),
+    short: line,
+    path: "/leave",
   };
 }
 
@@ -156,6 +169,7 @@ export function newTask(o: {
     subject: `📝 New todo from ${o.from}: ${o.title}`,
     text: `Hi ${o.name},\n\n${line}${footer(o.appUrl)}`,
     html: layout(o.appUrl, "A new todo", p(line)),
+    short: line,
   };
 }
 
@@ -185,5 +199,9 @@ export function monthlySummary(o: {
       `${o.month}: ${result}`,
       list(lines) + (reward ? p(reward) : "") + p("Scores start fresh this month."),
     ),
+    short: [o.scores.map((s) => `${s.name} ${s.total}`).join(" · "), reward]
+      .filter(Boolean)
+      .join(" · "),
+    path: "/points",
   };
 }

@@ -2,7 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatTime } from "@/lib/chore-meta";
 import { addDays, formatDay, toISTDate, type DateStr } from "@/lib/dates";
-import { appUrl, sendEmail, type SendEmail } from "@/lib/email";
+import { appUrl, emailConfigured, sendEmail, type SendEmail } from "@/lib/email";
+import { pushConfigured, sendPush, type PushMessage } from "@/lib/push";
 import {
   dailyDigest,
   handover,
@@ -35,8 +36,15 @@ type Profile = {
   name: string;
   email: string;
   email_notifications: boolean;
+  push_notifications: boolean;
   digest_time: string;
 };
+
+export type SendPush = (
+  db: SupabaseClient,
+  userId: string,
+  message: PushMessage,
+) => Promise<number>;
 
 export type TickResult = { sent: number; errors: string[] };
 
@@ -67,7 +75,19 @@ function check<T>(result: { data: unknown; error: { message: string } | null }, 
  */
 export async function runTick(
   db: SupabaseClient,
-  { now = Date.now(), send = sendEmail }: { now?: number; send?: SendEmail } = {},
+  {
+    now = Date.now(),
+    send = sendEmail,
+    push = sendPush,
+    emailReady = emailConfigured(),
+    pushReady = pushConfigured(),
+  }: {
+    now?: number;
+    send?: SendEmail;
+    push?: SendPush;
+    emailReady?: boolean;
+    pushReady?: boolean;
+  } = {},
 ): Promise<TickResult> {
   const url = appUrl();
   const today = toISTDate(now);
@@ -76,7 +96,9 @@ export async function runTick(
   await materialize(db, today, addDays(today, MATERIALIZE_DAYS - 1));
 
   const profiles = check<Profile[]>(
-    await db.from("profiles").select("id, name, email, email_notifications, digest_time"),
+    await db
+      .from("profiles")
+      .select("id, name, email, email_notifications, push_notifications, digest_time"),
     "profiles",
   );
   const byId = new Map(profiles.map((p) => [p.id, p]));
@@ -84,10 +106,47 @@ export async function runTick(
   const nameOf = (id: string | null, to: string) =>
     id === to ? "You" : (byId.get(id ?? "")?.name ?? "Your partner");
 
-  /** Logs the email first (so it's sent once), then sends it; un-logs on failure to retry. */
+  const wantsEmail = (p: Profile) => emailReady && p.email_notifications && Boolean(p.email);
+  const wantsPush = (p: Profile) => pushReady && p.push_notifications;
+
+  /**
+   * Sends by email and/or to their phones, as each person chose. Throws only if
+   * every channel tried failed; returns false if they want neither.
+   */
+  async function dispatch(profile: Profile, email: Email): Promise<boolean> {
+    const errors: string[] = [];
+    let delivered = false;
+    if (wantsEmail(profile)) {
+      try {
+        await send(profile.email, email);
+        delivered = true;
+      } catch (e) {
+        errors.push((e as Error).message);
+      }
+    }
+    if (wantsPush(profile)) {
+      try {
+        const devices = await push(db, profile.id, {
+          title: email.subject,
+          body: email.short,
+          path: email.path ?? "/",
+        });
+        if (devices > 0) delivered = true;
+      } catch (e) {
+        errors.push((e as Error).message);
+      }
+    }
+    if (!delivered && errors.length) throw new Error(errors.join("; "));
+    return delivered;
+  }
+
+  /**
+   * Logs the notification first (so it's sent once), then sends it. If every
+   * channel failed it's un-logged so the next tick retries.
+   */
   async function deliver(userId: string, kind: string, key: string, build: (p: Profile) => Email) {
     const profile = byId.get(userId);
-    if (!profile?.email_notifications || !profile.email) return;
+    if (!profile || (!wantsEmail(profile) && !wantsPush(profile))) return;
     const { data, error } = await db
       .from("notification_log")
       .upsert(
@@ -98,8 +157,7 @@ export async function runTick(
     if (error) return void result.errors.push(`${kind} ${key}: ${error.message}`);
     if (!data?.length) return; // already sent
     try {
-      await send(profile.email, build(profile));
-      result.sent++;
+      if (await dispatch(profile, build(profile))) result.sent++;
     } catch (e) {
       await db.from("notification_log").delete().eq("id", data[0].id);
       result.errors.push(`${kind} ${key}: ${(e as Error).message}`);
@@ -261,7 +319,7 @@ export async function runTick(
       .select("id");
     if (!claimed.data?.length) continue;
     const profile = byId.get(event.user_id);
-    if (!profile?.email_notifications || !profile.email) continue;
+    if (!profile || (!wantsEmail(profile) && !wantsPush(profile))) continue;
     const e = event.payload;
     const day = (d: unknown) => formatDay(String(d), "EEE d MMM");
     let email: Email | null = null;
@@ -299,8 +357,7 @@ export async function runTick(
     }
     if (!email) continue;
     try {
-      await send(profile.email, email);
-      result.sent++;
+      if (await dispatch(profile, email)) result.sent++;
     } catch (err) {
       const message = (err as Error).message;
       await db.from("notification_outbox").update({ error: message }).eq("id", event.id);
