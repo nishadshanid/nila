@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { Sidebar } from "@/components/nav/sidebar";
 import { BottomNav } from "@/components/nav/bottom-nav";
 import { UserChip } from "@/components/nav/user-chip";
@@ -19,9 +20,18 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           <Link href="/" className="text-lg font-semibold tracking-tight md:invisible">
             Nila
           </Link>
-          <Suspense fallback={<div className="bg-muted h-8 w-40 animate-pulse rounded" />}>
-            <UserChip />
-          </Suspense>
+          <div className="flex items-center gap-1">
+            <Link
+              href="/search"
+              aria-label="Search"
+              className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md p-2"
+            >
+              <Search className="size-5" />
+            </Link>
+            <Suspense fallback={<div className="bg-muted h-8 w-40 animate-pulse rounded" />}>
+              <UserChip />
+            </Suspense>
+          </div>
         </header>
         <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-24 md:pb-6">{children}</main>
       </div>

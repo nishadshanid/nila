@@ -238,3 +238,29 @@ export async function takeBackOccurrence(id: string): Promise<ActionResult> {
   refresh();
   return { ok: true };
 }
+
+/** Adds the chosen starter chores (see src/lib/starter-chores.ts). */
+export async function addStarterChores(keys: string[]): Promise<ActionResult & { added?: number }> {
+  const { STARTER_CHORES } = await import("@/lib/starter-chores");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You're signed out." };
+  const { data: partner } = await supabase
+    .from("profiles")
+    .select("id")
+    .neq("id", user.id)
+    .maybeSingle();
+
+  let added = 0;
+  for (const starter of STARTER_CHORES.filter((c) => keys.includes(c.key))) {
+    if (starter.needsPartner && !partner) continue;
+    const result = await saveChore(
+      starter.build({ meId: user.id, partnerId: partner?.id ?? null, today: todayIST() }),
+    );
+    if (!result.ok) return { ...result, added };
+    added++;
+  }
+  return { ok: true, added };
+}

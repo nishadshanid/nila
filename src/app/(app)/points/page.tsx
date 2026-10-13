@@ -11,6 +11,7 @@ import { getAllScores, getLedger, getRewards, type LedgerRow } from "@/lib/point
 import type { Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { RewardForm } from "./reward-form";
+import { Stats } from "./stats";
 
 export const metadata: Metadata = { title: "Points" };
 
@@ -198,8 +199,45 @@ function History({
   );
 }
 
-async function Points({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+function Tabs({ tab }: { tab: "scores" | "stats" }) {
+  const tabs = [
+    { value: "scores", label: "Scoreboard", href: "/points" },
+    { value: "stats", label: "Stats", href: "/points?tab=stats" },
+  ];
+  return (
+    <nav aria-label="Points view" className="bg-muted mb-6 flex rounded-lg p-1">
+      {tabs.map((t) => (
+        <Link
+          key={t.value}
+          href={t.href}
+          aria-current={tab === t.value ? "page" : undefined}
+          className={cn(
+            "text-muted-foreground flex-1 rounded-md px-3 py-1.5 text-center text-sm font-medium transition-colors",
+            tab === t.value && "bg-background text-foreground shadow-sm",
+          )}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+async function Points({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string; tab?: string }>;
+}) {
   const params = await searchParams;
+  if (params.tab === "stats") {
+    const { me, people } = await getHousehold();
+    return (
+      <>
+        <Tabs tab="stats" />
+        <Stats people={people} meId={me.id} />
+      </>
+    );
+  }
   const current = monthKeyIST();
   const month =
     params.month && /^\d{4}-\d{2}$/.test(params.month) && params.month <= current
@@ -216,6 +254,7 @@ async function Points({ searchParams }: { searchParams: Promise<{ month?: string
 
   return (
     <>
+      <Tabs tab="scores" />
       {month !== current && (
         <Link href="/points" className="text-muted-foreground mb-3 inline-block text-sm underline">
           ← Back to {monthLabel(current, true)}

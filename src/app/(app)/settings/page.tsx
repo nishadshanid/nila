@@ -9,6 +9,7 @@ import { RulesForm } from "./rules-form";
 import { NotificationsForm } from "./notifications-form";
 import { emailConfigured } from "@/lib/email";
 import { InstallApp } from "@/components/pwa/install-app";
+import { ThemePicker } from "@/components/theme-picker";
 import { pushConfigured } from "@/lib/push";
 import { PushSettings } from "./push-settings";
 
@@ -53,7 +54,8 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>App</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <ThemePicker />
           <InstallApp />
         </CardContent>
       </Card>

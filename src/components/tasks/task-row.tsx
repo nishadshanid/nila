@@ -19,6 +19,7 @@ import { deleteTask, setTaskDone } from "@/app/(app)/plans/actions";
 import { formatTime, priorityMeta } from "@/lib/chore-meta";
 import { relativeDay, type DateStr } from "@/lib/dates";
 import { pointsFor, taskEarnsPoints } from "@/lib/points";
+import { tapFeedback } from "@/lib/haptics";
 import { StartsIn, TimerButton } from "@/components/timers/timer";
 import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ export function TaskRow({
   const points = taskEarnsPoints(task) ? pointsFor(task, rules) : 0;
 
   function toggle(checked: boolean) {
+    if (checked) tapFeedback();
     startTransition(async () => {
       setDone(checked);
       const result = await setTaskDone(task.id, checked);

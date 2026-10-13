@@ -21,6 +21,7 @@ import {
 } from "@/app/(app)/chores/actions";
 import { categoryMeta, formatTime, priorityMeta } from "@/lib/chore-meta";
 import { pointsFor } from "@/lib/points";
+import { tapFeedback } from "@/lib/haptics";
 import type { OccurrenceWithChore } from "@/lib/chores";
 import { cn } from "@/lib/utils";
 import { StartsIn, TimerButton } from "@/components/timers/timer";
@@ -101,6 +102,7 @@ export function ChoreCard({
   }
 
   function toggle(checked: boolean) {
+    if (checked) tapFeedback();
     startTransition(async () => {
       setDone(checked);
       const result = await setOccurrenceDone(occurrence.id, checked);

@@ -78,3 +78,43 @@ export async function getRewards(): Promise<Map<string, string>> {
   if (error) throw new Error(`Could not load rewards: ${error.message}`);
   return new Map(data.map((r) => [r.month as string, r.title as string]));
 }
+
+/** Every ledger row (two people: small), for the stats. */
+export async function getAllLedger(): Promise<LedgerRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("points_ledger")
+    .select("*")
+    .order("earned_at")
+    .limit(10000);
+  if (error) throw new Error(`Could not load points history: ${error.message}`);
+  return data as LedgerRow[];
+}
+
+/** How many of each person's chores were done each day (yours and together ones). */
+export async function getChoreDays(people: string[], from: string, to: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("chore_occurrences")
+    .select("date, status, assignee_id, chore:chores!inner(flex_target)")
+    .gte("date", from)
+    .lte("date", to)
+    .neq("status", "skipped")
+    .is("chore.flex_target", null);
+  if (error) throw new Error(`Could not load chores: ${error.message}`);
+
+  const days = new Map(
+    people.map((id) => [id, new Map<string, { total: number; done: number }>()]),
+  );
+  for (const o of data as { date: string; status: string; assignee_id: string | null }[]) {
+    for (const id of o.assignee_id ? [o.assignee_id] : people) {
+      const map = days.get(id);
+      if (!map) continue;
+      const d = map.get(o.date) ?? { total: 0, done: 0 };
+      d.total++;
+      if (o.status === "done") d.done++;
+      map.set(o.date, d);
+    }
+  }
+  return new Map([...days].map(([id, map]) => [id, [...map].map(([date, d]) => ({ date, ...d }))]));
+}

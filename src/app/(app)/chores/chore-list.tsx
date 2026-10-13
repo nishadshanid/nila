@@ -23,6 +23,7 @@ import { planOccurrences } from "@/lib/rotation";
 import type { Chore } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ChoreForm } from "./chore-form";
+import { StarterDialog } from "./starter-dialog";
 import { deleteChore, setChoreActive, type ActionResult } from "./actions";
 
 type Editing = { chore?: Chore } | null;
@@ -82,7 +83,8 @@ export function ChoreList({
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <StarterDialog existingTitles={chores.map((c) => c.title)} hasPartner={people.length > 1} />
         <Button onClick={() => setEditing({})}>
           <Plus /> Add chore
         </Button>

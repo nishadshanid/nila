@@ -19,6 +19,7 @@ import { personById, type Person } from "@/components/chores/people";
 import { daysBetween, formatDay, toISTDate, type DateStr } from "@/lib/dates";
 import { shoppingCategoryMeta, URGENCIES } from "@/lib/shopping-meta";
 import { formatQty } from "@/lib/shopping-parse";
+import { tapFeedback } from "@/lib/haptics";
 import type { ShoppingItem, Urgency } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ export function useBuy(item: ShoppingItem, { quiet = false } = {}) {
   const [pending, startTransition] = useTransition();
 
   function toggle(next: boolean) {
+    if (next) tapFeedback();
     startTransition(async () => {
       setOptimistic(next);
       const result = await setBought(item.id, next);
