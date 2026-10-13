@@ -18,7 +18,19 @@ export async function signIn(_prev: LoginState, formData: FormData): Promise<Log
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: "Wrong email or password.", email };
+  if (error) {
+    if (error.code === "invalid_credentials") return { error: "Wrong email or password.", email };
+    if (error.code === "email_not_confirmed") {
+      return { error: "This account isn't confirmed yet. Confirm it in Supabase → Users.", email };
+    }
+    // Anything else is a setup problem (wrong Supabase key or URL, Supabase down), not
+    // the password: say so, so it can be fixed.
+    console.error("[login] Supabase sign-in failed", error.status, error.code, error.message);
+    return {
+      error: `Couldn't reach the login service (${error.message}). Check the Supabase settings on the server.`,
+      email,
+    };
+  }
 
   redirect("/");
 }
