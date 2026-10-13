@@ -129,4 +129,15 @@
   html {
     @apply font-sans;
   }
+  /* Chunkier, softer icon lines to match the rounded logo and fonts. */
+  svg.lucide {
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* Lines thin out as icons shrink; small ones get a bit more to look as bold. */
+  svg.lucide[class*="size-3"],
+  svg.lucide[class*="size-4"] {
+    stroke-width: 2.75;
+  }
 }
