@@ -34,9 +34,13 @@ async function notifyNewItem(
   } = await supabase.auth.getUser();
   if (!user) return;
   const amount = [item.qty, item.unit].filter(Boolean).join(" ");
+  const label = `${item.name}${amount ? ` (${amount})` : ""}`;
+  // The phone folds items added close together into one notification.
   notifyPartner(user.id, (name) => ({
-    body: `${name} added ${item.name}${amount ? ` (${amount})` : ""} to the shopping list`,
+    title: "🛒 Shopping list",
+    body: `${name} added ${label}`,
     path: "/shopping",
+    group: { key: `shopping:${user.id}`, who: name, item: label },
   }));
 }
 

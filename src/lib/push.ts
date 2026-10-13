@@ -3,7 +3,14 @@ import { clean } from "@/lib/clean-env";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 
-export type PushMessage = { title: string; body: string; path?: string; tag?: string };
+export type PushMessage = {
+  title: string;
+  body: string;
+  path?: string;
+  tag?: string;
+  /** Merge into one notification on the phone (see public/sw.js), e.g. shopping items. */
+  group?: { key: string; who: string; item: string };
+};
 
 const publicKey = () => clean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
 

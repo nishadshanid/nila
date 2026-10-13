@@ -3,6 +3,8 @@
 // only Next's versioned static files and the icons are cached.
 
 const CACHE = "nila-v3";
+// Items in a group (e.g. shopping) added within this long share one notification.
+const GROUP_WINDOW_MS = 30 * 60 * 1000;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = [OFFLINE_URL, "/logo.png", "/icons/icon-192.png"];
 
@@ -58,16 +60,43 @@ self.addEventListener("push", (event) => {
   } catch {
     if (event.data) message.body = event.data.text();
   }
-  event.waitUntil(
-    self.registration.showNotification(message.title, {
-      body: message.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      tag: message.tag,
-      data: { path: message.path || "/" },
-    }),
-  );
+  event.waitUntil(show(message));
 });
+
+async function show(message) {
+  const options = {
+    body: message.body,
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag: message.tag,
+    data: { path: message.path || "/" },
+  };
+  const group = message.group;
+  if (group) {
+    // Fold this item into a recent notification from the same group, if it's still
+    // showing: one notification that grows, and only the first one buzzes.
+    let items = [group.item];
+    let merged = false;
+    try {
+      const [previous] = await self.registration.getNotifications({ tag: group.key });
+      const data = previous?.data;
+      if (data?.items && Date.now() - data.at < GROUP_WINDOW_MS) {
+        items = [...data.items, group.item];
+        merged = true;
+      }
+    } catch {
+      // getNotifications isn't everywhere; then each item is its own notification.
+    }
+    const shown =
+      items.slice(0, 6).join(", ") + (items.length > 6 ? ` +${items.length - 6} more` : "");
+    options.tag = group.key;
+    options.renotify = !merged;
+    options.body =
+      items.length === 1 ? message.body : `${group.who} added ${items.length} items: ${shown}`;
+    options.data = { ...options.data, items, at: Date.now() };
+  }
+  return self.registration.showNotification(message.title, options);
+}
 
 // Tapping a notification opens Nila (reusing an open window if there is one).
 self.addEventListener("notificationclick", (event) => {
