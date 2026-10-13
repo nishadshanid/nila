@@ -129,6 +129,13 @@
   html {
     @apply font-sans;
   }
+  /* Dropdown lists are drawn by the phone; give options solid colours so their
+     text never ends up light-on-light (e.g. Nila in dark mode, phone in light). */
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
   /* Chunkier, softer icon lines to match the rounded logo and fonts. */
   svg.lucide {
     stroke-width: 2.4;
