@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { reminderInputSchema, type ReminderInput } from "@/lib/reminder-schema";
+import { notifyPartner } from "@/lib/notify-partner";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -20,6 +21,17 @@ export async function saveReminder(input: ReminderInput, id?: string): Promise<A
     return { ok: false, error: "Only the person who created it can make it private." };
   }
   if (error) return { ok: false, error: error.message };
+  if (!id && parsed.data.visibility === "couple") {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      notifyPartner(user.id, (name) => ({
+        body: `${name} added a reminder: ${parsed.data.title}`,
+        path: "/reminders",
+      }));
+    }
+  }
   refresh();
   return { ok: true };
 }

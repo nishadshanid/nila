@@ -155,24 +155,6 @@ export function leaveAdded(o: {
   };
 }
 
-/** Your partner added a couple todo for you (or both of you). */
-export function newTask(o: {
-  appUrl: string | null;
-  name: string;
-  from: string;
-  title: string;
-  forBoth: boolean;
-  when: string | null;
-}): Email {
-  const line = `${o.from} added "${o.title}" ${o.forBoth ? "for both of you" : "for you"}${o.when ? `, due ${o.when}` : ""}.`;
-  return {
-    subject: `📝 New todo from ${o.from}: ${o.title}`,
-    text: `Hi ${o.name},\n\n${line}${footer(o.appUrl)}`,
-    html: layout(o.appUrl, "A new todo", p(line)),
-    short: line,
-  };
-}
-
 /** Last month's points. */
 export function monthlySummary(o: {
   appUrl: string | null;

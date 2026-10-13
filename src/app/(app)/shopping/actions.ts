@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { shoppingInputSchema, type ShoppingInput } from "@/lib/shopping-schema";
+import { notifyPartner } from "@/lib/notify-partner";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -19,8 +20,24 @@ export async function saveItem(input: ShoppingInput, id?: string): Promise<Actio
     ? await supabase.from("shopping_items").update(values).eq("id", id)
     : await supabase.from("shopping_items").insert(values);
   if (error) return { ok: false, error: error.message };
+  if (!id) await notifyNewItem(supabase, values);
   refresh();
   return { ok: true };
+}
+
+async function notifyNewItem(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  item: { name: string; qty: number | null; unit: string | null },
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  const amount = [item.qty, item.unit].filter(Boolean).join(" ");
+  notifyPartner(user.id, (name) => ({
+    body: `${name} added ${item.name}${amount ? ` (${amount})` : ""} to the shopping list`,
+    path: "/shopping",
+  }));
 }
 
 export async function setBought(id: string, bought: boolean): Promise<ActionResult> {
@@ -57,6 +74,7 @@ export async function buyAgain(id: string): Promise<ActionResult> {
     .from("shopping_items")
     .insert({ ...data, urgency: "this_week" });
   if (insertError) return { ok: false, error: insertError.message };
+  await notifyNewItem(supabase, data);
   refresh();
   return { ok: true };
 }

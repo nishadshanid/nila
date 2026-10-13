@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { choreInputSchema, type ChoreInput } from "@/lib/chore-schema";
 import { regenerateFuture } from "@/lib/occurrences";
 import { todayIST } from "@/lib/dates";
+import { notifyPartner } from "@/lib/notify-partner";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -14,6 +15,14 @@ function fail(error: unknown): ActionResult {
 
 /** Creates a chore, or updates it when `id` is given, then re-plans its future days. */
 export async function saveChore(input: ChoreInput, id?: string): Promise<ActionResult> {
+  return save(input, id, true);
+}
+
+async function save(
+  input: ChoreInput,
+  id: string | undefined,
+  notify: boolean,
+): Promise<ActionResult> {
   const parsed = choreInputSchema.safeParse(input);
   if (!parsed.success)
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid chore" };
@@ -37,6 +46,13 @@ export async function saveChore(input: ChoreInput, id?: string): Promise<ActionR
     if (error) return { ok: false, error: error.message };
 
     await regenerateFuture(supabase, data.id);
+    // Shared chores (taking turns or together) are news for your partner.
+    if (notify && !id && values.assignment_type !== "fixed") {
+      notifyPartner(user.id, (name) => ({
+        body: `${name} added a shared chore: ${values.title}`,
+        path: "/chores",
+      }));
+    }
     refresh();
     return { ok: true };
   } catch (e) {
@@ -254,13 +270,25 @@ export async function addStarterChores(keys: string[]): Promise<ActionResult & {
     .maybeSingle();
 
   let added = 0;
+  let shared = 0;
   for (const starter of STARTER_CHORES.filter((c) => keys.includes(c.key))) {
     if (starter.needsPartner && !partner) continue;
-    const result = await saveChore(
-      starter.build({ meId: user.id, partnerId: partner?.id ?? null, today: todayIST() }),
-    );
+    const input = starter.build({
+      meId: user.id,
+      partnerId: partner?.id ?? null,
+      today: todayIST(),
+    });
+    const result = await save(input, undefined, false);
     if (!result.ok) return { ...result, added };
     added++;
+    if (input.assignment_type !== "fixed") shared++;
+  }
+  // One notification for the whole batch, not one per chore.
+  if (shared > 0) {
+    notifyPartner(user.id, (name) => ({
+      body: `${name} added ${shared} shared chore${shared === 1 ? "" : "s"}`,
+      path: "/chores",
+    }));
   }
   return { ok: true, added };
 }

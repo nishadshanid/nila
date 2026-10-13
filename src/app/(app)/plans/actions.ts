@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { taskInputSchema, type TaskInput } from "@/lib/task-schema";
+import { notifyPartner } from "@/lib/notify-partner";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -21,6 +22,20 @@ export async function saveTask(input: TaskInput, id?: string): Promise<ActionRes
     return { ok: false, error: "Only the person who created it can make it private." };
   }
   if (error) return { ok: false, error: error.message };
+  const task = parsed.data;
+  if (!id && task.visibility === "couple") {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    // A couple todo assigned only to yourself isn't news for your partner.
+    if (user && task.assignee_id !== user.id) {
+      const what = task.kind === "plan" ? "a plan" : task.assignee_id ? "a todo for you" : "a todo";
+      notifyPartner(user.id, (name) => ({
+        body: `${name} added ${what}: ${task.title}`,
+        path: task.kind === "plan" ? "/plans" : "/",
+      }));
+    }
+  }
   refresh();
   return { ok: true };
 }

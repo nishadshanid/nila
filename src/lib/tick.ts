@@ -10,7 +10,6 @@ import {
   itemReminder,
   leaveAdded,
   monthlySummary,
-  newTask,
   type Email,
   type Line,
 } from "@/lib/email-templates";
@@ -292,7 +291,8 @@ export async function runTick(
     }
   }
 
-  // 4. Events from the outbox: hand-overs, leaves, new todos for your partner.
+  // 4. Events from the outbox: hand-overs and leaves. (New shared items are pushed
+  // straight away by notifyPartner; old new_task rows are just marked sent.)
   const pending = check<
     {
       id: number;
@@ -344,15 +344,6 @@ export async function runTick(
         state: LEAVE_STATE[e.type as keyof typeof LEAVE_STATE] ?? "on leave",
         range,
         note: (e.note as string) ?? null,
-      });
-    } else if (event.kind === "new_task") {
-      email = newTask({
-        appUrl: url,
-        name: profile.name,
-        from: nameOf(e.from as string, profile.id),
-        title: String(e.title),
-        forBoth: Boolean(e.for_both),
-        when: e.date ? whenLabel(String(e.date), (e.time as string) ?? null, today) : null,
       });
     }
     if (!email) continue;
