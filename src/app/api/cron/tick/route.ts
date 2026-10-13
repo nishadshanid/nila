@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { clean } from "@/lib/clean-env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured } from "@/lib/email";
 import { pushConfigured } from "@/lib/push";
@@ -8,7 +9,7 @@ import { runTick } from "@/lib/tick";
 export const maxDuration = 60;
 
 function authorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
+  const secret = clean(process.env.CRON_SECRET);
   const header = request.headers.get("authorization") ?? "";
   if (!secret || secret.length < 16) return false;
   const expected = Buffer.from(`Bearer ${secret}`);

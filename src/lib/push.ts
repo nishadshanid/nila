@@ -1,21 +1,25 @@
 import "server-only";
+import { clean } from "@/lib/clean-env";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 
 export type PushMessage = { title: string; body: string; path?: string; tag?: string };
 
+const publicKey = () => clean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+
 /** Whether phone notifications are set up (the VAPID key pair). */
 export function pushConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+  return Boolean(publicKey() && clean(process.env.VAPID_PRIVATE_KEY));
 }
 
 let ready = false;
 function setup() {
   if (ready) return;
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || `mailto:${process.env.GMAIL_USER ?? "nila@example.com"}`,
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!,
+    clean(process.env.VAPID_SUBJECT) ||
+      `mailto:${clean(process.env.GMAIL_USER) || "nila@example.com"}`,
+    publicKey(),
+    clean(process.env.VAPID_PRIVATE_KEY),
   );
   ready = true;
 }

@@ -1,17 +1,22 @@
 import "server-only";
+import { clean } from "@/lib/clean-env";
 import nodemailer, { type Transporter } from "nodemailer";
 import type { Email } from "@/lib/email-templates";
 
 export type SendEmail = (to: string, email: Email) => Promise<void>;
 
+const gmailUser = () => clean(process.env.GMAIL_USER);
+// Google shows app passwords in groups of four ("abcd efgh …"); the spaces aren't part of it.
+const gmailPassword = () => clean(process.env.GMAIL_APP_PASSWORD).replace(/\s+/g, "");
+
 /** Whether Gmail sending is set up (GMAIL_USER and GMAIL_APP_PASSWORD). */
 export function emailConfigured() {
-  return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+  return Boolean(gmailUser() && gmailPassword());
 }
 
 /** The app's public address for links in emails, without a trailing slash. */
 export function appUrl(): string | null {
-  return process.env.APP_URL?.replace(/\/+$/, "") || null;
+  return clean(process.env.APP_URL).replace(/\/+$/, "") || null;
 }
 
 let transport: Transporter | null = null;
@@ -23,10 +28,10 @@ export const sendEmail: SendEmail = async (to, email) => {
     host: "smtp.gmail.com",
     port: 465,
     secure: true,
-    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+    auth: { user: gmailUser(), pass: gmailPassword() },
   });
   await transport.sendMail({
-    from: { name: "Nila", address: process.env.GMAIL_USER! },
+    from: { name: "Nila", address: gmailUser() },
     to,
     subject: email.subject,
     text: email.text,

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { clean } from "@/lib/clean-env";
 import {
   removePushSubscription,
   savePushSubscription,
@@ -13,7 +14,7 @@ import {
   updatePushPreference,
 } from "./actions";
 
-const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+const VAPID_KEY = clean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
 
 function base64UrlToBytes(value: string) {
   const padded = (value + "=".repeat((4 - (value.length % 4)) % 4))
