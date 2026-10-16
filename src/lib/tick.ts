@@ -16,11 +16,13 @@ import {
 import {
   candidateDates,
   digestDue,
+  dueAt,
   inWindow,
   istInstant,
   monthlySummaryDue,
   reminderAt,
 } from "@/lib/notify-schedule";
+import { withMissed } from "@/lib/missed-chores";
 import { MATERIALIZE_DAYS, materialize } from "@/lib/occurrences";
 import { leaderOf, monthLabel } from "@/lib/points";
 import { reminderOccursOn, reminderOnDay, yearsSince } from "@/lib/reminder-schedule";
@@ -37,6 +39,7 @@ type Profile = {
   email_notifications: boolean;
   push_notifications: boolean;
   digest_time: string;
+  nudge_times: string[] | null;
 };
 
 export type SendPush = (
@@ -48,6 +51,23 @@ export type SendPush = (
 export type TickResult = { sent: number; errors: string[] };
 
 const LEAVE_STATE = { away: "away", sick: "sick", other: "on leave" } as const;
+
+type DeliverOptions = {
+  /** Phone only, never email (the pending nudges). */
+  pushOnly?: boolean;
+  /** A newer notification with the same tag replaces the older one. */
+  tag?: string;
+};
+
+/** "4 things pending today: Dishes, Milk and 2 more" */
+function nudge(titles: string[]): Email {
+  const n = titles.length;
+  const shown = titles.slice(0, 3);
+  const rest = n - shown.length;
+  const short = rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
+  const subject = `${n} thing${n === 1 ? "" : "s"} pending today`;
+  return { subject, short, path: "/", html: "", text: short };
+}
 
 /** "Today at 10:00 AM", "Tomorrow", "Wed 14 Oct at 6:00 PM" */
 function whenLabel(date: DateStr, time: string | null, today: DateStr) {
@@ -97,7 +117,7 @@ export async function runTick(
   const profiles = check<Profile[]>(
     await db
       .from("profiles")
-      .select("id, name, email, email_notifications, push_notifications, digest_time"),
+      .select("id, name, email, email_notifications, push_notifications, digest_time, nudge_times"),
     "profiles",
   );
   const byId = new Map(profiles.map((p) => [p.id, p]));
@@ -112,10 +132,14 @@ export async function runTick(
    * Sends by email and/or to their phones, as each person chose. Throws only if
    * every channel tried failed; returns false if they want neither.
    */
-  async function dispatch(profile: Profile, email: Email): Promise<boolean> {
+  async function dispatch(
+    profile: Profile,
+    email: Email,
+    { pushOnly = false, tag }: DeliverOptions = {},
+  ): Promise<boolean> {
     const errors: string[] = [];
     let delivered = false;
-    if (wantsEmail(profile)) {
+    if (!pushOnly && wantsEmail(profile)) {
       try {
         await send(profile.email, email);
         delivered = true;
@@ -129,6 +153,7 @@ export async function runTick(
           title: email.subject,
           body: email.short,
           path: email.path ?? "/",
+          tag,
         });
         if (devices > 0) delivered = true;
       } catch (e) {
@@ -143,9 +168,15 @@ export async function runTick(
    * Logs the notification first (so it's sent once), then sends it. If every
    * channel failed it's un-logged so the next tick retries.
    */
-  async function deliver(userId: string, kind: string, key: string, build: (p: Profile) => Email) {
+  async function deliver(
+    userId: string,
+    kind: string,
+    key: string,
+    build: (p: Profile) => Email,
+    options: DeliverOptions = {},
+  ) {
     const profile = byId.get(userId);
-    if (!profile || (!wantsEmail(profile) && !wantsPush(profile))) return;
+    if (!profile || ((options.pushOnly || !wantsEmail(profile)) && !wantsPush(profile))) return;
     const { data, error } = await db
       .from("notification_log")
       .upsert(
@@ -156,7 +187,7 @@ export async function runTick(
     if (error) return void result.errors.push(`${kind} ${key}: ${error.message}`);
     if (!data?.length) return; // already sent
     try {
-      if (await dispatch(profile, build(profile))) result.sent++;
+      if (await dispatch(profile, build(profile), options)) result.sent++;
     } catch (e) {
       await db.from("notification_log").delete().eq("id", data[0].id);
       result.errors.push(`${kind} ${key}: ${(e as Error).message}`);
@@ -265,6 +296,33 @@ export async function runTick(
     );
   }
 
+  // 2b. "4 things pending today", pushed at each person's nudge times while
+  // anything is still open.
+  for (const profile of profiles) {
+    if (!wantsPush(profile)) continue;
+    for (const time of profile.nudge_times ?? []) {
+      const day = dueAt(time, now);
+      if (!day) continue;
+      const sections = await digestFor(db, profile.id, day, allReminders, acked, {
+        headsUps: false,
+      });
+      const lines = [
+        ...sections.chores,
+        ...sections.todos,
+        ...sections.reminders,
+        ...sections.shopping,
+      ];
+      if (lines.length === 0) continue;
+      await deliver(
+        profile.id,
+        "nudge",
+        `${day}|${time.slice(0, 5)}`,
+        () => nudge(lines.map((l) => l.title)),
+        { pushOnly: true, tag: "nudge" },
+      );
+    }
+  }
+
   // 3. Monthly points summary, on the 1st from 08:00.
   const month = monthlySummaryDue(now);
   if (month) {
@@ -366,12 +424,16 @@ async function digestFor(
   day: DateStr,
   reminders: Reminder[],
   acked: Set<string>,
+  { headsUps = true }: { headsUps?: boolean } = {},
 ) {
   const [occurrences, tasks, shopping] = await Promise.all([
+    // Today's chores plus any left undone on earlier days.
     db
       .from("chore_occurrences")
-      .select("due_time, assignee_id, chore:chores!inner(title, flex_target)")
-      .eq("date", day)
+      .select(
+        "chore_id, date, due_time, assignee_id, chore:chores!inner(title, flex_target, active)",
+      )
+      .lte("date", day)
       .eq("status", "pending")
       .or(`assignee_id.eq.${userId},assignee_id.is.null`)
       .is("chore.flex_target", null)
@@ -385,12 +447,23 @@ async function digestFor(
     db.from("shopping_items").select("*").eq("status", "needed").eq("urgency", "today"),
   ]);
 
-  type Occ = { due_time: string | null; assignee_id: string | null; chore: { title: string } };
-  const chores: Line[] = check<Occ[]>(occurrences, "chores").map((o) => ({
+  type Occ = {
+    chore_id: string;
+    date: DateStr;
+    due_time: string | null;
+    assignee_id: string | null;
+    chore: { title: string; active: boolean };
+  };
+  const pending = check<Occ[]>(occurrences, "chores");
+  const chores: Line[] = withMissed(
+    pending.filter((o) => o.date === day),
+    pending.filter((o) => o.date < day && o.chore.active),
+  ).map((o) => ({
     title: o.chore.title,
     detail:
-      [formatTime(o.due_time), o.assignee_id ? null : "together"].filter(Boolean).join(" · ") ||
-      null,
+      [o.missed.length ? "missed" : formatTime(o.due_time), o.assignee_id ? null : "together"]
+        .filter(Boolean)
+        .join(" · ") || null,
   }));
 
   const mine = (t: Task) =>
@@ -413,6 +486,7 @@ async function digestFor(
     .flatMap((r) => {
       const hit = reminderOnDay(r, day);
       if (!hit || acked.has(`${r.id}|${hit.date}`)) return [];
+      if (!headsUps && hit.inDays > 0) return [];
       const years =
         r.type === "birthday" || r.type === "anniversary"
           ? yearsSince(r.start_date, hit.date)

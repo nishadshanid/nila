@@ -1,23 +1,13 @@
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
-import { ItemRow } from "@/components/shopping/item-row";
-import type { DateStr } from "@/lib/dates";
-import type { Person, ShoppingItem } from "@/lib/types";
+import { BuyTodayItem } from "@/components/shopping/buy-today-item";
+import type { ShoppingItem } from "@/lib/types";
 
-/** Today's must-buys on the Today page, plus a count of this week's. */
-export function BuyToday({
-  items,
-  weekCount,
-  people,
-  meId,
-  today,
-}: {
-  items: ShoppingItem[];
-  weekCount: number;
-  people: Person[];
-  meId: string;
-  today: DateStr;
-}) {
+/** How many of today's must-buys to list before "+N more". */
+const SHOWN = 2;
+
+/** Today's must-buys on the Today page in one small box, plus a count of this week's. */
+export function BuyToday({ items, weekCount }: { items: ShoppingItem[]; weekCount: number }) {
   if (items.length === 0 && weekCount === 0) return null;
   const more = weekCount > 0 ? `${weekCount} more this week` : "Open list";
   return (
@@ -33,11 +23,22 @@ export function BuyToday({
         </Link>
       </h2>
       {items.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {items.map((item) => (
-            <ItemRow key={item.id} item={item} people={people} meId={meId} today={today} />
-          ))}
-        </ul>
+        <div className="bg-card flex items-center gap-3 rounded-xl border p-3">
+          <ul className="flex min-w-0 flex-1 flex-col gap-2">
+            {items.slice(0, SHOWN).map((item) => (
+              <BuyTodayItem key={item.id} item={item} />
+            ))}
+          </ul>
+          {items.length > SHOWN && (
+            <Link
+              href="/shopping"
+              className="bg-muted text-muted-foreground hover:text-foreground shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
+              aria-label={`${items.length - SHOWN} more to buy today`}
+            >
+              +{items.length - SHOWN}
+            </Link>
+          )}
+        </div>
       )}
     </section>
   );

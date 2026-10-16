@@ -92,7 +92,7 @@ export async function setOccurrenceDone(id: string, done: boolean): Promise<Acti
   // You tick off your own and together chores; your partner's are theirs.
   const { data: occurrence, error: loadError } = await supabase
     .from("chore_occurrences")
-    .select("assignee_id")
+    .select("chore_id, date, assignee_id")
     .eq("id", id)
     .single();
   if (loadError) return { ok: false, error: loadError.message };
@@ -109,6 +109,21 @@ export async function setOccurrenceDone(id: string, done: boolean): Promise<Acti
     )
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  // Doing it once clears the earlier days it was missed, which carried over to
+  // today. They're skipped rather than done, so they earn no extra points.
+  if (done) {
+    const earlier = supabase
+      .from("chore_occurrences")
+      .update({ status: "skipped" })
+      .eq("chore_id", occurrence.chore_id)
+      .eq("status", "pending")
+      .lt("date", occurrence.date);
+    const { error: clearError } = await (occurrence.assignee_id
+      ? earlier.eq("assignee_id", occurrence.assignee_id)
+      : earlier.is("assignee_id", null));
+    if (clearError) return { ok: false, error: clearError.message };
+  }
   refresh();
   return { ok: true };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { EllipsisVertical, Hand, Undo2 } from "lucide-react";
+import { EllipsisVertical, Hand, History, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +21,8 @@ import {
 } from "@/app/(app)/chores/actions";
 import { categoryMeta, formatTime, priorityMeta } from "@/lib/chore-meta";
 import { pointsFor } from "@/lib/points";
+import { addDays, formatDay, todayIST } from "@/lib/dates";
+import { missedLabel } from "@/lib/missed-chores";
 import { tapFeedback } from "@/lib/haptics";
 import type { OccurrenceWithChore } from "@/lib/chores";
 import { cn } from "@/lib/utils";
@@ -84,6 +86,13 @@ export function ChoreCard({
   const time = formatTime(occurrence.due_time);
   const turnOf = showTurn && !done ? personById(people, occurrence.assignee_id) : null;
   const moved = movedNote(occurrence, people, meId);
+  const missed = done
+    ? null
+    : missedLabel(occurrence.missed ?? [], addDays(todayIST(), -1), (d) =>
+        formatDay(d, "EEE d MMM"),
+      );
+  // A carried-over row from an earlier day: its start time has long passed.
+  const carried = occurrence.missed?.includes(occurrence.date) ?? false;
   const rules = usePointRules();
   const base = pointsFor(chore, rules);
   // Covering for someone (or doing a together chore alone) earns the bonus too.
@@ -142,7 +151,7 @@ export function ChoreCard({
             </>
           )}
           {time}
-          {!done && !paused && (
+          {!done && !paused && !carried && (
             <StartsIn
               date={occurrence.date}
               time={occurrence.due_time}
@@ -157,6 +166,11 @@ export function ChoreCard({
             </>
           )}
         </p>
+        {missed && (
+          <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+            <History className="size-3" /> {missed}
+          </p>
+        )}
         {moved && <p className="text-xs text-amber-700 dark:text-amber-400">{moved}</p>}
       </div>
 

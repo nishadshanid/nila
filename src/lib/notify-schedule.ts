@@ -38,14 +38,21 @@ export function candidateDates(now: number, maxBeforeMin: number): DateStr[] {
   return dates.length ? dates : [today];
 }
 
+/**
+ * The IST day whose `time` ("HH:MM[:SS]") falls in this tick's window, if any.
+ * A time just before midnight is caught by the first tick after it.
+ */
+export function dueAt(time: string, now: number): DateStr | null {
+  const today = toISTDate(now);
+  if (inWindow(istInstant(today, time), now)) return today;
+  const yesterday = addDays(today, -1);
+  if (inWindow(istInstant(yesterday, time), now)) return yesterday;
+  return null;
+}
+
 /** Whether this tick should send the daily digest for someone who wants it at `digestTime`. */
 export function digestDue(digestTime: string, now: number): DateStr | null {
-  const today = toISTDate(now);
-  if (inWindow(istInstant(today, digestTime), now)) return today;
-  // A digest time just before midnight, caught by the first tick after it.
-  const yesterday = addDays(today, -1);
-  if (inWindow(istInstant(yesterday, digestTime), now)) return yesterday;
-  return null;
+  return dueAt(digestTime, now);
 }
 
 /**

@@ -9,6 +9,8 @@ export type Profile = {
   email_notifications: boolean;
   push_notifications: boolean;
   digest_time: string;
+  /** "HH:MM:SS" times for the "things pending" push, at most three. */
+  nudge_times: string[];
   created_at: string;
   updated_at: string;
 };

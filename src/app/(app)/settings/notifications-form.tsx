@@ -11,7 +11,7 @@ import type { Profile } from "@/lib/types";
 import { updateNotifications } from "./actions";
 
 // Every 15 minutes, matching when the reminder job runs.
-const TIMES = Array.from({ length: 4 * 24 }, (_, i) => {
+export const TIMES = Array.from({ length: 4 * 24 }, (_, i) => {
   const h = String(Math.floor(i / 4)).padStart(2, "0");
   const m = String((i % 4) * 15).padStart(2, "0");
   return `${h}:${m}`;

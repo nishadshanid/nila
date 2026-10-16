@@ -319,7 +319,7 @@ async function Today({
   const view: View = params.view === "couple" && partner ? "couple" : "mine";
   const [occurrences, flexible, leaves, tasks, reminders, shopping, rules, scores] =
     await Promise.all([
-      getChoresForDay(date),
+      getChoresForDay(date, today),
       getFlexibleForDay(date),
       getLeavesOn(date),
       getTasksForDay(date, today),
@@ -423,15 +423,7 @@ async function Today({
       )}
 
       <TaskSection title="Plans" tasks={plans} people={people} meId={me.id} today={today} />
-      {shopping && (
-        <BuyToday
-          items={shopping.today}
-          weekCount={shopping.weekCount}
-          people={people}
-          meId={me.id}
-          today={today}
-        />
-      )}
+      {shopping && <BuyToday items={shopping.today} weekCount={shopping.weekCount} />}
 
       {noChores ? (
         <p className="text-muted-foreground mb-6 rounded-xl border border-dashed p-6 text-center text-sm">

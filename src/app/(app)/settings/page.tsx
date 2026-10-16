@@ -12,6 +12,7 @@ import { InstallApp } from "@/components/pwa/install-app";
 import { ThemePicker } from "@/components/theme-picker";
 import { pushConfigured } from "@/lib/push";
 import { PushSettings } from "./push-settings";
+import { NudgeTimesForm } from "./nudge-times-form";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -27,6 +28,9 @@ async function Notifications() {
       <NotificationsForm profile={me} emailReady={emailConfigured()} />
       <div className="border-t pt-6">
         <PushSettings enabled={me.push_notifications} serverReady={pushConfigured()} />
+      </div>
+      <div className="border-t pt-6">
+        <NudgeTimesForm times={me.nudge_times ?? []} enabled={me.push_notifications} />
       </div>
     </div>
   );

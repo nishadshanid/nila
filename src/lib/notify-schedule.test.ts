@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   candidateDates,
   digestDue,
+  dueAt,
   inWindow,
   istInstant,
   monthlySummaryDue,
@@ -67,5 +68,14 @@ describe("monthly summary", () => {
   it("isn't due before 08:00 or on other days", () => {
     expect(monthlySummaryDue(at("2026-11-01T07:45:00+05:30"))).toBeNull();
     expect(monthlySummaryDue(at("2026-11-02T09:00:00+05:30"))).toBeNull();
+  });
+});
+
+describe("dueAt", () => {
+  it("fires once per time, on the tick at or just after it", () => {
+    expect(dueAt("14:00:00", at("2026-10-16T14:00:00+05:30"))).toBe("2026-10-16");
+    expect(dueAt("14:00:00", at("2026-10-16T14:15:00+05:30"))).toBe("2026-10-16");
+    expect(dueAt("14:00:00", at("2026-10-16T13:45:00+05:30"))).toBeNull();
+    expect(dueAt("14:00:00", at("2026-10-16T14:45:00+05:30"))).toBeNull();
   });
 });

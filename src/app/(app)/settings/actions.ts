@@ -58,6 +58,28 @@ export async function updateNotifications(
   return { ok: true };
 }
 
+const nudgeSchema = z
+  .array(z.string().regex(/^\d{2}:\d{2}$/, "Pick a time"))
+  .max(3, "At most three a day");
+
+/** When to push "things pending today" to your phone; up to three a day. */
+export async function updateNudgeTimes(times: string[]): Promise<ProfileState> {
+  const parsed = nudgeSchema.safeParse(times);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You're signed out." };
+
+  const nudge_times = [...new Set(parsed.data)].sort();
+  const { error } = await supabase.from("profiles").update({ nudge_times }).eq("id", user.id);
+  if (error) return { error: error.message };
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 const subscriptionSchema = z.object({
   endpoint: z.url(),
   keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) }),

@@ -3,9 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureOccurrences } from "@/lib/occurrences";
 import { addDays, type DateStr } from "@/lib/dates";
 import { flexPeriod } from "@/lib/recurrence";
+import { withMissed } from "@/lib/missed-chores";
 import type { Chore, ChoreOccurrence } from "@/lib/types";
 
-export type OccurrenceWithChore = ChoreOccurrence & { chore: Chore };
+export type OccurrenceWithChore = ChoreOccurrence & {
+  chore: Chore;
+  /** Earlier days this chore was left undone, oldest first (today only). */
+  missed?: DateStr[];
+};
 
 /** Chores you can manage: shared ones and your own. Your partner's own chores are theirs. */
 export async function getChores(): Promise<Chore[]> {
@@ -24,19 +29,41 @@ export async function getChores(): Promise<Chore[]> {
   return data as Chore[];
 }
 
-/** Chores scheduled on `date`, creating their rows first if needed. */
-export async function getChoresForDay(date: DateStr): Promise<OccurrenceWithChore[]> {
+/**
+ * Chores scheduled on `date`, creating their rows first if needed. Today also
+ * carries over chores left pending on earlier days until someone does them.
+ */
+export async function getChoresForDay(
+  date: DateStr,
+  today: DateStr,
+): Promise<OccurrenceWithChore[]> {
   const supabase = await createClient();
   await ensureOccurrences(supabase, date);
-  const { data, error } = await supabase
-    .from("chore_occurrences")
-    .select("*, chore:chores!inner(*)")
-    .eq("date", date)
-    // Flexible chores are shown with their weekly/monthly progress instead.
-    .is("chore.flex_target", null);
+  const select = "*, chore:chores!inner(*)";
+  const [{ data, error }, missed] = await Promise.all([
+    supabase
+      .from("chore_occurrences")
+      .select(select)
+      .eq("date", date)
+      // Flexible chores are shown with their weekly/monthly progress instead.
+      .is("chore.flex_target", null),
+    date === today
+      ? supabase
+          .from("chore_occurrences")
+          .select(select)
+          .lt("date", date)
+          .eq("status", "pending")
+          .eq("chore.active", true)
+          .is("chore.flex_target", null)
+      : null,
+  ]);
   if (error) throw new Error(`Could not load today's chores: ${error.message}`);
+  if (missed?.error) throw new Error(`Could not load missed chores: ${missed.error.message}`);
 
-  return (data as OccurrenceWithChore[]).sort(
+  return withMissed(
+    data as OccurrenceWithChore[],
+    (missed?.data ?? []) as OccurrenceWithChore[],
+  ).sort(
     (a, b) =>
       (a.due_time ?? "99").localeCompare(b.due_time ?? "99") ||
       a.chore.title.localeCompare(b.chore.title),
