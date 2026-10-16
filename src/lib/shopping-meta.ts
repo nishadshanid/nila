@@ -8,6 +8,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
+import { addDays, daysInMonth, startOfWeek, type DateStr } from "@/lib/dates";
 import type { Urgency } from "@/lib/types";
 
 /** Ordered roughly like a walk through the shop. */
@@ -65,6 +66,16 @@ export const URGENCIES: {
 
 export function urgencyMeta(value: Urgency) {
   return URGENCIES.find((u) => u.value === value) ?? URGENCIES[1];
+}
+
+/** Which section an item needed by `needBy` belongs in on `today` (weeks start Monday). */
+export function urgencyFor(needBy: DateStr, today: DateStr): Urgency {
+  if (needBy <= today) return "today";
+  if (needBy <= addDays(startOfWeek(today), 6)) return "this_week";
+  if (needBy <= `${today.slice(0, 8)}${String(daysInMonth(today)).padStart(2, "0")}`) {
+    return "this_month";
+  }
+  return "someday";
 }
 
 const CATEGORY_GUESSES: [RegExp, string][] = [

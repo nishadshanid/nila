@@ -79,7 +79,7 @@ export function ItemRow({
     id === meId ? "you" : (personById(people, id)?.name ?? "someone");
   const age = daysBetween(toISTDate(item.created_at), today);
   // A "this week" item that's been waiting over a week is worth a nudge.
-  const stale = !bought && item.urgency === "this_week" && age >= 7;
+  const stale = !bought && !item.need_by && item.urgency === "this_week" && age >= 7;
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     startTransition(async () => {
@@ -105,6 +105,7 @@ export function ItemRow({
             category: item.category,
             notes: item.notes,
             urgency,
+            need_by: null,
           },
           item.id,
         ),
@@ -142,7 +143,19 @@ export function ItemRow({
             </>
           ) : (
             <span className={cn(stale && "text-amber-700 dark:text-amber-400")}>
-              Added by {nameOf(item.added_by)} {ago(age)}
+              {item.need_by && !bought ? (
+                <>
+                  Needed by{" "}
+                  <span className="text-foreground font-medium">
+                    {item.need_by <= today ? "today" : formatDay(item.need_by, "EEE d MMM")}
+                  </span>{" "}
+                  · {nameOf(item.added_by)}
+                </>
+              ) : (
+                <>
+                  Added by {nameOf(item.added_by)} {ago(age)}
+                </>
+              )}
             </span>
           )}
           {item.notes && <> · {item.notes}</>}

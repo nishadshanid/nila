@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { NativeSelect } from "@/components/native-select";
 import { Segmented } from "@/components/segmented";
 import { ItemRow } from "@/components/shopping/item-row";
+import { WhenPicker, type When } from "@/components/shopping/when-picker";
 import type { Person } from "@/components/chores/people";
 import type { DateStr } from "@/lib/dates";
 import {
@@ -20,7 +21,7 @@ import {
   URGENCIES,
 } from "@/lib/shopping-meta";
 import { parseQuickAdd } from "@/lib/shopping-parse";
-import type { ShoppingItem, Urgency } from "@/lib/types";
+import type { ShoppingItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { saveItem } from "./actions";
 import { ItemForm } from "./item-form";
@@ -50,7 +51,7 @@ export function ShoppingView({
 }) {
   const [tab, setTab] = useState<"list" | "bought">("list");
   const [text, setText] = useState("");
-  const [urgency, setUrgency] = useState<Urgency>("this_week");
+  const [when, setWhen] = useState<When>({ urgency: "this_week", needBy: null });
   // "auto" guesses from the name (milk → Dairy); picking one sticks until you add.
   const [category, setCategory] = useState("auto");
   const [editing, setEditing] = useState<{ item?: ShoppingItem } | null>(null);
@@ -75,7 +76,12 @@ export function ShoppingView({
     if (!parsed?.name) return;
     const chosen = category === "auto" ? (guessed ?? "grocery") : category;
     startTransition(async () => {
-      const result = await saveItem({ ...parsed, category: chosen, urgency });
+      const result = await saveItem({
+        ...parsed,
+        category: chosen,
+        urgency: when.urgency,
+        need_by: when.needBy,
+      });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -128,22 +134,8 @@ export function ShoppingView({
                 <SlidersHorizontal />
               </Button>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Segmented
-                aria-label="When do you need it?"
-                value={urgency}
-                onChange={setUrgency}
-                className="min-w-0 sm:flex-1"
-                options={URGENCIES.map((u) => ({
-                  value: u.value,
-                  label: (
-                    <>
-                      <span className={cn("size-1.5 shrink-0 rounded-full", u.dot)} />
-                      {u.short}
-                    </>
-                  ),
-                }))}
-              />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <WhenPicker value={when} onChange={setWhen} dots className="sm:flex-1" />
               <NativeSelect
                 aria-label="Category"
                 value={category}
@@ -248,7 +240,7 @@ export function ShoppingView({
             <ItemForm
               key={editing.item?.id ?? "new"}
               item={editing.item}
-              urgency={urgency}
+              when={when}
               names={names}
               onDone={() => setEditing(null)}
             />

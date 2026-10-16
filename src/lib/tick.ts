@@ -26,6 +26,7 @@ import { withMissed } from "@/lib/missed-chores";
 import { MATERIALIZE_DAYS, materialize } from "@/lib/occurrences";
 import { leaderOf, monthLabel } from "@/lib/points";
 import { reminderOccursOn, reminderOnDay, yearsSince } from "@/lib/reminder-schedule";
+import { urgencyFor } from "@/lib/shopping-meta";
 import { formatQty } from "@/lib/shopping-parse";
 import type { Reminder, ShoppingItem, Task } from "@/lib/types";
 
@@ -113,6 +114,7 @@ export async function runTick(
   const result: TickResult = { sent: 0, errors: [] };
 
   await materialize(db, today, addDays(today, MATERIALIZE_DAYS - 1));
+  await moveDatedItems(db, today, result);
 
   const profiles = check<Profile[]>(
     await db
@@ -415,6 +417,25 @@ export async function runTick(
   }
 
   return result;
+}
+
+/** Moves shopping items with a need-by date up a section as the date gets closer. */
+async function moveDatedItems(db: SupabaseClient, today: DateStr, result: TickResult) {
+  const { data, error } = await db
+    .from("shopping_items")
+    .select("id, urgency, need_by")
+    .eq("status", "needed")
+    .not("need_by", "is", null);
+  if (error) return void result.errors.push(`shopping dates: ${error.message}`);
+  for (const item of data as Pick<ShoppingItem, "id" | "urgency" | "need_by">[]) {
+    const urgency = urgencyFor(item.need_by!, today);
+    if (urgency === item.urgency) continue;
+    const { error: moveError } = await db
+      .from("shopping_items")
+      .update({ urgency })
+      .eq("id", item.id);
+    if (moveError) result.errors.push(`shopping ${item.id}: ${moveError.message}`);
+  }
 }
 
 /** What one person has on `day`, for the morning email. */

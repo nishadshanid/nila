@@ -4,6 +4,8 @@ import { refresh } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { shoppingInputSchema, type ShoppingInput } from "@/lib/shopping-schema";
 import { notifyPartner } from "@/lib/notify-partner";
+import { todayIST } from "@/lib/dates";
+import { urgencyFor } from "@/lib/shopping-meta";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -13,7 +15,13 @@ export async function saveItem(input: ShoppingInput, id?: string): Promise<Actio
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid item" };
   }
-  const values = { ...parsed.data, qty: parsed.data.qty ?? null };
+  const { need_by } = parsed.data;
+  const values = {
+    ...parsed.data,
+    qty: parsed.data.qty ?? null,
+    // A date decides the section; picking a section instead drops the date.
+    urgency: need_by ? urgencyFor(need_by, todayIST()) : parsed.data.urgency,
+  };
 
   const supabase = await createClient();
   const { error } = id

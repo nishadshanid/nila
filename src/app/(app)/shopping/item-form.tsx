@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/native-select";
-import { Segmented } from "@/components/segmented";
-import { guessCategory, SHOPPING_CATEGORIES, URGENCIES } from "@/lib/shopping-meta";
-import type { ShoppingItem, Urgency } from "@/lib/types";
+import { WhenPicker, type When } from "@/components/shopping/when-picker";
+import { guessCategory, SHOPPING_CATEGORIES } from "@/lib/shopping-meta";
+import type { ShoppingItem } from "@/lib/types";
 import { saveItem } from "./actions";
 
 const UNITS = ["", "kg", "g", "L", "ml", "pcs", "pack", "dozen", "bunch", "bottle", "box", "can"];
@@ -16,12 +16,12 @@ const UNITS = ["", "kg", "g", "L", "ml", "pcs", "pack", "dozen", "bunch", "bottl
 /** Add an item with all its details, or edit one. */
 export function ItemForm({
   item,
-  urgency: defaultUrgency,
+  when: defaultWhen,
   names,
   onDone,
 }: {
   item?: ShoppingItem;
-  urgency: Urgency;
+  when: When;
   /** Past item names, for autocomplete. */
   names: string[];
   onDone: () => void;
@@ -31,7 +31,9 @@ export function ItemForm({
   const [unit, setUnit] = useState(item?.unit ?? "");
   const [category, setCategory] = useState(item?.category ?? "grocery");
   const [categoryTouched, setCategoryTouched] = useState(item !== undefined);
-  const [urgency, setUrgency] = useState<Urgency>(item?.urgency ?? defaultUrgency);
+  const [when, setWhen] = useState<When>(
+    item ? { urgency: item.urgency, needBy: item.need_by } : defaultWhen,
+  );
   const [notes, setNotes] = useState(item?.notes ?? "");
   const [pending, startTransition] = useTransition();
   const units = unit && !UNITS.includes(unit) ? [...UNITS, unit] : UNITS;
@@ -40,7 +42,15 @@ export function ItemForm({
     e.preventDefault();
     startTransition(async () => {
       const result = await saveItem(
-        { name, qty: qty ? Number(qty) : null, unit, category, urgency, notes },
+        {
+          name,
+          qty: qty ? Number(qty) : null,
+          unit,
+          category,
+          urgency: when.urgency,
+          need_by: when.needBy,
+          notes,
+        },
         item?.id,
       );
       if (!result.ok) {
@@ -102,12 +112,7 @@ export function ItemForm({
 
       <div className="flex flex-col gap-2">
         <Label>When do you need it?</Label>
-        <Segmented
-          aria-label="When do you need it?"
-          value={urgency}
-          onChange={setUrgency}
-          options={URGENCIES.map((u) => ({ value: u.value, label: u.short }))}
-        />
+        <WhenPicker value={when} onChange={setWhen} />
       </div>
 
       <div className="flex flex-col gap-2">

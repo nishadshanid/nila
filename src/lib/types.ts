@@ -146,6 +146,8 @@ export type ShoppingItem = {
   unit: string | null;
   category: string;
   urgency: Urgency;
+  /** Needed by this date; `urgency` follows it as the date gets closer. */
+  need_by: string | null;
   notes: string | null;
   status: "needed" | "bought";
   added_by: string;
